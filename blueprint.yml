@@ -117,23 +117,11 @@ blueprint:
           selector:
             boolean:
         
-        window_switches:
-          name: Window Switch(es)
-          description: >
-            Die "Open Window Switch" Entität(en) der Thermostate.
-            WICHTIG: Reihenfolge muss mit den Thermostaten übereinstimmen!
-          default: []
-          selector:
-            entity:
-              multiple: true
-              filter:
-                - domain: switch
-        
         window_sensors:
           name: Fensterkontakte
           description: >
-            Wähle alle Fenster- und Türkontakte.
-            Sobald einer davon geöffnet wird, werden alle Window Switches aktiviert.
+            Wähle alle Fenster- und Türkontakte für diesen Raum.
+            Sobald einer davon geöffnet wird, schaltet das Thermostat in den "Open Window" Modus.
           default: []
           selector:
             entity:
@@ -152,7 +140,6 @@ variables:
   temp_max: !input temp_max
   round_precision: !input round_precision
   enable_window: !input enable_window_detection
-  window_switches: !input window_switches
   window_sensors: !input window_sensors
   
   # Konvertiere Thermostats zu Liste
@@ -204,6 +191,27 @@ variables:
       {% endif %}
     {% endfor %}
     {{ ns.selects }}
+  
+  # Finde automatisch die zugehörigen Open Window Switch Entitäten
+  window_switch_list: >
+    {% set ns = namespace(switches=[]) %}
+    {% if thermostats is string %}
+      {% set tlist = [thermostats] %}
+    {% else %}
+      {% set tlist = thermostats %}
+    {% endif %}
+    {% for thermostat in tlist %}
+      {% set device_id = device_id(thermostat) %}
+      {% if device_id %}
+        {% set entities = device_entities(device_id) %}
+        {% for entity in entities %}
+          {% if 'open_window' in entity and states[entity].domain == 'switch' %}
+            {% set ns.switches = ns.switches + [entity] %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.switches }}
 
 triggers:
   - trigger: time_pattern
@@ -276,19 +284,12 @@ actions:
   
   # ==================== FENSTER-ERKENNUNG ====================
   - condition: template
-    value_template: "{{ enable_window and window_switches and window_switches | length > 0 and window_sensors and window_sensors | length > 0 }}"
+    value_template: "{{ enable_window and window_switch_list and window_switch_list | length > 0 and window_sensors and window_sensors | length > 0 }}"
   
   - variables:
       # Prüfe ob IRGENDEIN Fenster offen ist
       any_window_open: >
         {{ expand(window_sensors) | selectattr('state', 'in', ['on', 'open']) | list | count > 0 }}
-      
-      window_switch_list: >
-        {% if window_switches is string %}
-          {{ [window_switches] }}
-        {% else %}
-          {{ window_switches }}
-        {% endif %}
   
   # Setze ALLE Window Switches
   - repeat:

@@ -38,7 +38,7 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 ### 🪟 Fenster-Erkennung (Optional)
 - **Automatische Heizungssteuerung** bei offenen Fenstern
 - **Multi-Sensor-Support** - Überwacht mehrere Fenster/Türen
-- **Intelligente Steuerung** des "Open Window Switch" am Thermostat
+- **Automatische Erkennung** des "Open Window Switch" am Thermostat
 - Bei mehreren Thermostaten: **EINES offen = ALLE informiert**
 
 ### ⚙️ Flexibel & Konfigurierbar
@@ -124,10 +124,8 @@ use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
     thermostats: climate.kinderzimmer_thermostat
-    temp_inputs: number.kinderzimmer_external_temp
     temp_sensors: sensor.kinderzimmer_temperatur
     enable_window_detection: true
-    window_switches: switch.kinderzimmer_open_window
     window_sensors:
       - binary_sensor.kinderzimmer_fenster
 ```
@@ -143,10 +141,6 @@ use_blueprint:
       - climate.wohnzimmer_heizkoerper_1
       - climate.wohnzimmer_heizkoerper_2
       - climate.wohnzimmer_heizkoerper_3
-    temp_inputs:
-      - number.wohnzimmer_external_temp_1
-      - number.wohnzimmer_external_temp_2
-      - number.wohnzimmer_external_temp_3
     temp_sensors:
       - sensor.wohnzimmer_temp_ecke_links  # 20.5°C
       - sensor.wohnzimmer_temp_ecke_rechts # 21.0°C
@@ -168,19 +162,11 @@ use_blueprint:
       - climate.wohnzimmer_thermostat
       - climate.kueche_thermostat
       - climate.essbereich_thermostat
-    temp_inputs:
-      - number.wohnzimmer_external_temp
-      - number.kueche_external_temp
-      - number.essbereich_external_temp
     temp_sensors:
       - sensor.wohnzimmer_temperatur
       - sensor.kueche_temperatur
       - sensor.essbereich_temperatur
     enable_window_detection: true
-    window_switches:
-      - switch.wohnzimmer_window
-      - switch.kueche_window
-      - switch.essbereich_window
     window_sensors:
       - binary_sensor.wohnzimmer_fenster_1
       - binary_sensor.wohnzimmer_fenster_2
@@ -191,8 +177,8 @@ use_blueprint:
 ```
 
 **Fenster-Logik:**
-- Terrassentür öffnet → **ALLE** 3 Window Switches gehen AN
-- Alle Fenster zu → **ALLE** 3 Window Switches gehen AUS
+- Terrassentür öffnet → **ALLE** 3 Thermostate aktivieren automatisch den "Open Window" Modus
+- Alle Fenster zu → **ALLE** 3 Thermostate deaktivieren den "Open Window" Modus
 
 ---
 
