@@ -12,6 +12,8 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 [![Blueprint](https://img.shields.io/badge/Blueprint-automation-orange.svg)](https://www.home-assistant.io/docs/automation/using_blueprints/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+---
+
 ## 📋 Inhaltsverzeichnis
 
 - [Features](#-features)
@@ -19,9 +21,9 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 - [Installation](#-installation)
 - [Verwendung](#-verwendung)
 - [Beispiele](#-beispiele)
-- [Fehlerbehebung](#-fehlerbehebung)
-- [FAQ](#-faq)
-- [Changelog](#-changelog)
+- [Lizenz](#-lizenz)
+
+---
 
 ## ✨ Features
 
@@ -45,18 +47,20 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 - **Übersichtliche UI** mit zusammenklappbaren Sektionen
 - **Ein Blueprint für alles** - Kein separates Blueprint für Zonen nötig
 
+---
+
 ## 🔧 Voraussetzungen
 
 - **Home Assistant** Version 2024.6.0 oder höher
-- **Sonoff Thermostat(e)** (z.B. TRVZB, NSPanel Thermostat)
-  - Muss die "External Temperature Input" Funktion unterstützen
-  - Optional: "Open Window Switch" für Fenster-Erkennung
-- **Externe(r) Temperatursensor(en)** (z.B. Aqara, Zigbee Temperature Sensor)
+- **Sonoff Thermostat(e)** mit "External Temperature Input" Funktion (z.B. TRVZB, NSPanel)
+- **Externe(r) Temperatursensor(en)** (z.B. Aqara, Zigbee)
 - Optional: **Fenster-/Türkontakte** für die Fenster-Erkennung
+
+---
 
 ## 📥 Installation
 
-### Methode 1: Über die UI (empfohlen)
+### Über die UI (empfohlen)
 
 1. In Home Assistant navigiere zu: **Einstellungen** → **Automationen & Szenen** → **Blueprints**
 2. Klicke auf den Button **Blueprint importieren** (unten rechts)
@@ -65,13 +69,9 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
    https://github.com/EyJunge1/ha-sonoff-smart-climate/blob/main/blueprint.yml
    ```
 4. Klicke auf **Vorschau** und dann **Importieren**
+5. Fertig! Das Blueprint erscheint in deiner Liste
 
-### Methode 2: Manuell
-
-1. Lade die `blueprint.yml` herunter
-2. Kopiere die Datei nach: `<config>/blueprints/automation/sonoff_smart_climate/`
-3. Erstelle den Ordner falls er nicht existiert
-4. Starte Home Assistant neu oder lade die Automationen neu
+---
 
 ## 🎯 Verwendung
 
@@ -81,7 +81,7 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 2. Gib ihr einen aussagekräftigen Namen (z.B. "Wohnzimmer Thermostat")
 3. Wähle **ein** Thermostat, **einen** Temp Input, **einen** Sensor
 4. Optional: Aktiviere Fenster-Erkennung
-5. Speichern & aktivieren
+5. Speichern & aktivieren ✅
 
 ### Mehrere Thermostate (große Räume/Zonen)
 
@@ -90,7 +90,9 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 3. Wähle **mehrere** Thermostate und entsprechende Temp Inputs
 4. Wähle einen oder **mehrere** Temperatursensoren (Durchschnitt wird berechnet)
 5. Optional: Aktiviere Fenster-Erkennung mit mehreren Window Switches
-6. **WICHTIG:** Reihenfolge bei Thermostaten/Inputs/Switches muss übereinstimmen!
+6. ⚠️ **WICHTIG:** Reihenfolge bei Thermostaten/Inputs/Switches muss übereinstimmen!
+
+---
 
 ## 💡 Beispiele
 
@@ -184,106 +186,8 @@ use_blueprint:
 - Terrassentür öffnet → **ALLE** 3 Window Switches gehen AN
 - Alle Fenster zu → **ALLE** 3 Window Switches gehen AUS
 
-## 🔍 Fehlerbehebung
-
-### Problem: Temperatur wird nicht übertragen
-
-**Lösung:**
-1. Prüfe ob die externen Sensoren funktionieren und Werte liefern
-2. Überprüfe die Entity-IDs in der Automation
-3. Schaue in die Logs: **Einstellungen** → **System** → **Protokolle**
-4. Stelle sicher, dass die Temperatur zwischen Min/Max liegt
-
-### Problem: Bei mehreren Thermostaten funktioniert nur eines
-
-**Lösung:**
-1. Prüfe die **Reihenfolge** von Thermostaten, Temp Inputs und Window Switches
-2. Die Position muss übereinstimmen:
-   - Position 1: Thermostat 1 ↔ Temp Input 1 ↔ Window Switch 1
-   - Position 2: Thermostat 2 ↔ Temp Input 2 ↔ Window Switch 2
-3. Gleiche **Anzahl** von Thermostaten und Temp Inputs erforderlich
-
-### Problem: Fenster-Erkennung funktioniert nicht
-
-**Lösung:**
-1. Aktiviere "Fenster-Erkennung aktivieren"
-2. Stelle sicher, dass Window Switches und Fenstersensoren konfiguriert sind
-3. Prüfe ob die Fenstersensoren den korrekten Status melden (`on`/`open` für offen)
-
-### Problem: Durchschnittstemperatur scheint falsch
-
-**Lösung:**
-1. Überprüfe ob alle Sensoren gültige Werte liefern (nicht `unavailable` oder `unknown`)
-2. Ungültige Werte werden automatisch ignoriert - prüfe ob genug Sensoren verfügbar sind
-3. Ändere `round_precision` falls mehr/weniger Genauigkeit gewünscht ist
-
-## ❓ FAQ
-
-**F: Kann ich nur ein Thermostat steuern?**  
-A: Ja! Wähle einfach ein Thermostat, einen Temp Input und einen Sensor. Das Blueprint funktioniert für beides.
-
-**F: Kann ich mehrere Thermostate mit einem Blueprint steuern?**  
-A: Ja! Wähle einfach mehrere Thermostate und entsprechende Temp Inputs. Alle werden synchron mit der gleichen Temperatur versorgt.
-
-**F: Wie funktioniert die Durchschnittsberechnung?**  
-A: Alle gültigen Temperatursensoren werden addiert und durch die Anzahl geteilt. Ungültige Werte (`unavailable`, außerhalb Min/Max) werden automatisch ignoriert.
-
-**F: Müssen die Reihenfolgen übereinstimmen?**  
-A: Ja! Bei mehreren Thermostaten:
-- Thermostat 1 → Temp Input 1 → Window Switch 1
-- Thermostat 2 → Temp Input 2 → Window Switch 2
-- usw.
-
-**F: Was passiert wenn ein Sensor offline geht?**  
-A: Der Blueprint ignoriert ungültige Werte automatisch. Solange mindestens ein Sensor gültige Werte liefert, funktioniert die Automation.
-
-**F: Muss ich die Fenster-Erkennung nutzen?**  
-A: Nein, sie ist komplett optional. Du kannst sie aktivieren oder deaktivieren.
-
-**F: Welche Sonoff Thermostate werden unterstützt?**  
-A: Alle Sonoff Thermostate die "External Temperature Input" unterstützen, z.B. TRVZB, NSPanel Thermostat.
-
-**F: Kann ich verschiedene Update-Intervalle pro Raum haben?**  
-A: Ja! Erstelle separate Automationen mit unterschiedlichen Einstellungen.
-
-## 📝 Changelog
-
-### Version 1.0.0 (2025-01-XX)
-- 🎉 Erste öffentliche Version
-- ✨ **Flexibles Blueprint** für einzelne oder mehrere Thermostate
-- ✨ Durchschnittstemperatur aus mehreren Sensoren
-- ✨ Gemeinsame Fenster-Erkennung für Zonen
-- ✨ Konfigurierbare Einstellungen
-- ✨ Input Sections für bessere UX
-- 📖 Umfangreiche Dokumentation
+---
 
 ## 📄 Lizenz
 
 MIT License - siehe [LICENSE](LICENSE) Datei für Details.
-
-## 🙏 Credits
-
-- Entwickelt für die [Home Assistant](https://www.home-assistant.io/) Community
-- Inspiriert von [Sonoff](https://sonoff.tech/) Thermostaten
-- Icons von [Material Design Icons](https://materialdesignicons.com/)
-
-## 🤝 Beitragen
-
-Contributions sind willkommen! Bitte:
-1. Fork das Repository
-2. Erstelle einen Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit deine Änderungen (`git commit -m 'Add some AmazingFeature'`)
-4. Push zum Branch (`git push origin feature/AmazingFeature`)
-5. Öffne einen Pull Request
-
-## 📞 Support
-
-- 🐛 **Issues:** [GitHub Issues](https://github.com/EyJunge1/ha-sonoff-smart-climate/issues)
-- 💬 **Diskussionen:** [Home Assistant Community](https://community.home-assistant.io/)
-- 📖 **Dokumentation:** [Wiki](https://github.com/EyJunge1/ha-sonoff-smart-climate/wiki)
-
----
-
-**⭐ Wenn dir dieses Blueprint gefällt, gib dem Repository einen Stern!**
-
-Made with ❤️ for the Home Assistant Community
