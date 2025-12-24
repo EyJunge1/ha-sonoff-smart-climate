@@ -8,6 +8,7 @@ blueprint:
     - Simple configuration: Just select thermostats and sensors
     - Control single or multiple thermostats
     - One or multiple temperature sensors (average calculated for multiple sensors)
+    - Automatic synchronization of target temperatures for multiple thermostats
     - Optional: Window detection for automatic heating control
     - Configurable update intervals and temperature limits
     
@@ -25,13 +26,17 @@ blueprint:
       icon: mdi:thermostat
       description: >
         Select one or multiple thermostats and the associated sensors.
-        For multiple thermostats, all will be controlled synchronously.
+        For multiple thermostats: All use the same external temperature sensor, and 
+        when you adjust any thermostat, all others automatically match its temperature.
+        Simply turn the dial on any thermostat and all others follow!
       input:
         thermostats:
           name: Thermostat(s)
           description: >
             One or multiple Sonoff thermostats.
-            For multiple thermostats, all will receive the same temperature.
+            For multiple thermostats: When you change the temperature on any thermostat 
+            (by turning the dial), all others will automatically follow. This prevents 
+            conflicts where thermostats work against each other.
           selector:
             entity:
               multiple: true
@@ -100,14 +105,25 @@ blueprint:
               min: 0
               max: 2
               step: 1
+        
+        sync_target_temperature:
+          name: Synchronize Target Temperature
+          description: >
+            When multiple thermostats are used, automatically synchronize their target temperatures 
+            to avoid conflicts. When you change the temperature on any thermostat (by turning the dial),
+            all other thermostats will automatically be set to the same temperature. This ensures all 
+            radiators work together instead of against each other.
+          default: true
+          selector:
+            boolean:
     
     # ==================== WINDOW DETECTION (Optional) ====================
     window_section:
       name: Window Detection (Optional)
       icon: mdi:window-open
       description: >
-        Automatic heating control with open windows.
-        For multiple thermostats, all will be notified.
+        Automatic heating control with open windows. Reacts instantly when 
+        any window/door opens or closes. For multiple thermostats, all will be notified.
       collapsed: true
       input:
         enable_window_detection:
@@ -121,7 +137,8 @@ blueprint:
           name: Window Contacts
           description: >
             Select all window and door contacts for this room.
-            As soon as one of them is opened, the thermostat switches to "Open Window" mode.
+            As soon as one of them opens or closes, ALL thermostats immediately react 
+            and switch to "Open Window" mode. Works instantly, no delay!
           default: []
           selector:
             entity:
@@ -134,35 +151,28 @@ blueprint:
                     - opening
 
 variables:
+  # User inputs
   thermostats: !input thermostats
   temp_sensors: !input temp_sensors
   temp_min: !input temp_min
   temp_max: !input temp_max
   round_precision: !input round_precision
+  sync_target_temp: !input sync_target_temperature
   enable_window: !input enable_window_detection
   window_sensors: !input window_sensors
   
-  # Convert thermostats to list
+  # Convert thermostats to list (handle single or multiple)
   thermostat_list: >
-    {% if thermostats is string %}
-      {{ [thermostats] }}
-    {% else %}
-      {{ thermostats }}
-    {% endif %}
+    {{ [thermostats] if thermostats is string else thermostats }}
   
-  # Automatically find the associated External Temperature Input entities
+  # Auto-detect: External Temperature Input entities (number.xxx_external_temperature_input)
   temp_input_list: >
     {% set ns = namespace(inputs=[]) %}
-    {% if thermostats is string %}
-      {% set tlist = [thermostats] %}
-    {% else %}
-      {% set tlist = thermostats %}
-    {% endif %}
+    {% set tlist = [thermostats] if thermostats is string else thermostats %}
     {% for thermostat in tlist %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
-        {% set entities = device_entities(device_id) %}
-        {% for entity in entities %}
+        {% for entity in device_entities(device_id) %}
           {% if 'external_temperature_input' in entity and not ('_2' in entity or '_3' in entity) %}
             {% set ns.inputs = ns.inputs + [entity] %}
           {% endif %}
@@ -171,19 +181,14 @@ variables:
     {% endfor %}
     {{ ns.inputs }}
   
-  # Automatically find the associated Temperature Sensor Select entities
+  # Auto-detect: Temperature Sensor Select entities (select.xxx_temperature_sensor)
   temp_sensor_select_list: >
     {% set ns = namespace(selects=[]) %}
-    {% if thermostats is string %}
-      {% set tlist = [thermostats] %}
-    {% else %}
-      {% set tlist = thermostats %}
-    {% endif %}
+    {% set tlist = [thermostats] if thermostats is string else thermostats %}
     {% for thermostat in tlist %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
-        {% set entities = device_entities(device_id) %}
-        {% for entity in entities %}
+        {% for entity in device_entities(device_id) %}
           {% if 'temperature_sensor' in entity and states[entity].domain == 'select' %}
             {% set ns.selects = ns.selects + [entity] %}
           {% endif %}
@@ -192,19 +197,14 @@ variables:
     {% endfor %}
     {{ ns.selects }}
   
-  # Automatically find the associated Open Window Switch entities
+  # Auto-detect: Open Window Switch entities (switch.xxx_open_window)
   window_switch_list: >
     {% set ns = namespace(switches=[]) %}
-    {% if thermostats is string %}
-      {% set tlist = [thermostats] %}
-    {% else %}
-      {% set tlist = thermostats %}
-    {% endif %}
+    {% set tlist = [thermostats] if thermostats is string else thermostats %}
     {% for thermostat in tlist %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
-        {% set entities = device_entities(device_id) %}
-        {% for entity in entities %}
+        {% for entity in device_entities(device_id) %}
           {% if 'open_window' in entity and states[entity].domain == 'switch' %}
             {% set ns.switches = ns.switches + [entity] %}
           {% endif %}
@@ -214,35 +214,48 @@ variables:
     {{ ns.switches }}
 
 triggers:
+  # Regular interval: Update external temperature every 30 seconds
   - trigger: time_pattern
     seconds: "/30"
+  
+  # Initialize on Home Assistant startup
   - trigger: homeassistant
     event: start
+  
+  # Instant reaction: Temperature sensor changed
   - trigger: state
     entity_id: !input temp_sensors
+  
+  # Instant reaction: Thermostat target temperature changed (dial turned)
+  - trigger: state
+    entity_id: !input thermostats
+    attribute: temperature
+  
+  # Instant reaction: Window/door opened or closed
+  - trigger: state
+    entity_id: !input window_sensors
 
 condition: []
 
 actions:
-  # ==================== CALCULATE AVERAGE TEMPERATURE ====================
+  # ==================== STEP 1: CALCULATE AVERAGE TEMPERATURE ====================
   - variables:
-      # Collect all valid temperature values
+      # Collect valid temperature values (exclude unavailable/unknown sensors)
       valid_temps: >
         {% set ns = namespace(temps=[]) %}
-        {% if temp_sensors is string %}
-          {% set sensor_list = [temp_sensors] %}
-        {% else %}
-          {% set sensor_list = temp_sensors %}
-        {% endif %}
+        {% set sensor_list = [temp_sensors] if temp_sensors is string else temp_sensors %}
         {% for sensor in sensor_list %}
-          {% set temp = states(sensor) | float(0) %}
-          {% if temp >= temp_min and temp <= temp_max %}
-            {% set ns.temps = ns.temps + [temp] %}
+          {% set temp_state = states(sensor) %}
+          {% if temp_state not in ['unavailable', 'unknown', 'none', ''] %}
+            {% set temp = temp_state | float(-999) %}
+            {% if temp > -999 and temp >= temp_min and temp <= temp_max %}
+              {% set ns.temps = ns.temps + [temp] %}
+            {% endif %}
           {% endif %}
         {% endfor %}
         {{ ns.temps }}
       
-      # Calculate average
+      # Calculate average temperature from all valid sensors
       avg_temp: >
         {% if valid_temps | length > 0 %}
           {{ (valid_temps | sum / valid_temps | length) | round(round_precision) }}
@@ -250,17 +263,21 @@ actions:
           {{ 0 }}
         {% endif %}
   
-  # Check if we have valid temperatures
+  # Validate: Check if we have valid data to proceed
   - condition: template
-    value_template: "{{ valid_temps | length > 0 and avg_temp | float > 0 }}"
+    value_template: >
+      {{ valid_temps | length > 0 and 
+         avg_temp | float > 0 and
+         thermostat_list | length > 0 and
+         temp_input_list | length > 0 and
+         temp_sensor_select_list | length > 0 }}
   
-  # ==================== SET TEMPERATURE SENSOR TO "EXTERNAL" ====================
+  # ==================== STEP 2: CONFIGURE THERMOSTATS TO USE EXTERNAL SENSOR ====================
   - repeat:
       count: "{{ temp_sensor_select_list | length }}"
       sequence:
         - variables:
-            current_index: "{{ repeat.index - 1 }}"
-            current_sensor_select: "{{ temp_sensor_select_list[current_index] }}"
+            current_sensor_select: "{{ temp_sensor_select_list[repeat.index - 1] }}"
         
         - action: select.select_option
           target:
@@ -268,13 +285,12 @@ actions:
           data:
             option: "external"
   
-  # ==================== SEND TEMPERATURE TO ALL THERMOSTATS ====================
+  # ==================== STEP 3: SEND AVERAGE TEMPERATURE TO ALL THERMOSTATS ====================
   - repeat:
       count: "{{ temp_input_list | length }}"
       sequence:
         - variables:
-            current_index: "{{ repeat.index - 1 }}"
-            current_temp_input: "{{ temp_input_list[current_index] }}"
+            current_temp_input: "{{ temp_input_list[repeat.index - 1] }}"
         
         - action: number.set_value
           target:
@@ -282,26 +298,69 @@ actions:
           data:
             value: "{{ avg_temp }}"
   
-  # ==================== WINDOW DETECTION ====================
+  # ==================== STEP 4: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
+  # Only run if: sync enabled, multiple thermostats, and trigger was a thermostat change
   - condition: template
-    value_template: "{{ enable_window and window_switch_list and window_switch_list | length > 0 and window_sensors and window_sensors | length > 0 }}"
+    value_template: >
+      {{ sync_target_temp and 
+         thermostat_list | length > 1 and 
+         trigger is defined and 
+         trigger.entity_id is defined and
+         trigger.entity_id in thermostat_list and
+         trigger.to_state is defined and
+         trigger.to_state.attributes.temperature is defined }}
   
   - variables:
-      # Check if ANY window is open
-      any_window_open: >
-        {{ expand(window_sensors) | selectattr('state', 'in', ['on', 'open']) | list | count > 0 }}
+      triggered_thermostat: "{{ trigger.entity_id }}"
+      new_target_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
   
-  # Set ALL window switches
+  - condition: template
+    value_template: "{{ new_target_temp | float > 0 }}"
+  
+  # Apply new temperature to all OTHER thermostats (if different)
+  - repeat:
+      count: "{{ thermostat_list | length }}"
+      sequence:
+        - variables:
+            current_thermostat: "{{ thermostat_list[repeat.index - 1] }}"
+            current_temp: "{{ state_attr(current_thermostat, 'temperature') | float(0) }}"
+        
+        # Skip if: same thermostat OR temperature already matches
+        - condition: template
+          value_template: >
+            {{ current_thermostat != triggered_thermostat and
+               current_temp != new_target_temp }}
+        
+        - action: climate.set_temperature
+          target:
+            entity_id: "{{ current_thermostat }}"
+          data:
+            temperature: "{{ new_target_temp }}"
+  
+  # ==================== STEP 5: WINDOW DETECTION (OPTIONAL) ====================
+  # Only run if: window detection enabled and sensors configured
+  - condition: template
+    value_template: >
+      {{ enable_window and 
+         window_switch_list | length > 0 and 
+         window_sensors | length > 0 }}
+  
+  - variables:
+      # Check if ANY window/door is open
+      any_window_open: >
+        {{ expand(window_sensors) 
+           | selectattr('state', 'in', ['on', 'open']) 
+           | list | count > 0 }}
+  
+  # Toggle "Open Window" mode on ALL thermostats
   - repeat:
       count: "{{ window_switch_list | length }}"
       sequence:
         - variables:
-            current_index: "{{ repeat.index - 1 }}"
-            current_switch: "{{ window_switch_list[current_index] }}"
+            current_switch: "{{ window_switch_list[repeat.index - 1] }}"
         
         - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
           target:
             entity_id: "{{ current_switch }}"
 
-mode: single
-max_exceeded: silent
+mode: restart
