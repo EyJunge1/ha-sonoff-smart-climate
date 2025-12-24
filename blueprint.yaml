@@ -1,0 +1,573 @@
+blueprint:
+  name: Sonoff Smart Climate Control
+  description: >
+    Intelligent control of Sonoff thermostats (TRVZB) with external temperature sensors.
+
+    **Features:**
+    - Works with Zigbee2MQTT and ZHA
+    - Automatic detection of all required entities
+    - Simple configuration: Just select thermostats and sensors
+    - Control single or multiple thermostats
+    - One or multiple temperature sensors (average calculated for multiple sensors)
+    - Automatic fallback to internal sensor if external sensors become unavailable
+    - Failsafe refresh: re-pushes temperature before the TRVZB 2-hour timeout
+    - Compatible with old (`external`/`internal`) and new (`remote_temperature`/`local_temperature`) select options
+    - Automatic synchronization of target temperatures for multiple thermostats
+    - Optional: Window detection for automatic heating control
+    - Configurable temperature limits and rounding precision
+    - Auto-converts °F / K sensor values to Celsius
+    - Ignores a thermostat's own temperature sensor as source
+    - Optional: skip updates while a thermostat is off (avoids waking it)
+
+    Flexible for single rooms or large zones with multiple radiators.
+  domain: automation
+  author: EyJunge1
+  source_url: https://github.com/eyjunge1/ha-sonoff-smart-climate/blob/main/blueprint.yaml
+  homeassistant:
+    min_version: "2024.10.0"
+
+  input:
+    thermostat_section:
+      name: Thermostat Configuration
+      icon: mdi:thermostat
+      description: >
+        Select one or multiple thermostats and the associated sensors.
+        For multiple thermostats: All use the same external temperature sensor, and
+        when you adjust any thermostat, all others automatically match its temperature.
+        Simply turn the dial on any thermostat and all others follow!
+        Supports Zigbee2MQTT and ZHA.
+      input:
+        thermostats:
+          name: Thermostat(s)
+          description: >
+            One or multiple Sonoff thermostats (climate entities).
+            For multiple thermostats: When you change the temperature on any thermostat
+            (by turning the dial), all others will automatically follow. This prevents
+            conflicts where thermostats work against each other.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: climate
+
+        temp_sensors:
+          name: Temperature Sensor(s)
+          description: >
+            One or multiple external temperature sensors (e.g. Aqara, Zigbee).
+            For multiple sensors, the average temperature will be calculated.
+            Do not select the thermostat's own temperature sensor — it is ignored automatically.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: sensor
+                  device_class: temperature
+
+    settings_section:
+      name: Settings
+      icon: mdi:cog
+      description: Configure the behavior of synchronization
+      collapsed: true
+      input:
+        temp_min:
+          name: Minimum Temperature
+          description: Temperature values below this value will be ignored as invalid (after °C conversion)
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 15
+              step: 1
+              unit_of_measurement: °C
+
+        temp_max:
+          name: Maximum Temperature
+          description: Temperature values above this value will be ignored as invalid (after °C conversion)
+          default: 50
+          selector:
+            number:
+              min: 30
+              max: 60
+              step: 1
+              unit_of_measurement: °C
+
+        round_precision:
+          name: Rounding Precision
+          description: How many decimal places to round to
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 2
+              step: 1
+
+        sync_target_temperature:
+          name: Synchronize Target Temperature
+          description: >
+            When multiple thermostats are used, automatically synchronize their target temperatures
+            to avoid conflicts. When you change the temperature on any thermostat (by turning the dial),
+            all other thermostats will automatically be set to the same temperature. This ensures all
+            radiators work together instead of against each other.
+          default: true
+          selector:
+            boolean:
+
+        failsafe_refresh_minutes:
+          name: Failsafe Refresh Interval
+          description: >
+            Re-push the external temperature at least this often (even if unchanged).
+            The Sonoff TRVZB falls back to its internal sensor if it receives no external
+            update for ~2 hours. Keep this below 120 minutes (recommended: 45).
+          default: 45
+          selector:
+            number:
+              min: 15
+              max: 90
+              step: 15
+              unit_of_measurement: minutes
+
+        skip_when_off:
+          name: Skip Updates When Thermostat Is Off
+          description: >
+            Do not write external temperature or change sensor mode while a thermostat
+            is off. Prevents periodic updates from waking a TRV that you turned off
+            on purpose (known side effect of number.set_value on some firmwares).
+          default: true
+          selector:
+            boolean:
+
+    window_section:
+      name: Window Detection (Optional)
+      icon: mdi:window-open
+      description: >
+        Automatic heating control with open windows. Reacts instantly when
+        any window/door opens or closes. For multiple thermostats, all will be notified.
+      collapsed: true
+      input:
+        enable_window_detection:
+          name: Enable Window Detection
+          description: Enable automatic detection of open windows
+          default: false
+          selector:
+            boolean:
+
+        window_sensors:
+          name: Window Contacts
+          description: >
+            Select all window and door contacts for this room.
+            As soon as one of them opens or closes, ALL thermostats immediately react
+            and switch to "Open Window" mode. Works instantly, no delay!
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - window
+                    - door
+                    - opening
+
+variables:
+  thermostats: !input thermostats
+  temp_sensors: !input temp_sensors
+  temp_min: !input temp_min
+  temp_max: !input temp_max
+  round_precision: !input round_precision
+  sync_target_temp: !input sync_target_temperature
+  failsafe_refresh_minutes: !input failsafe_refresh_minutes
+  skip_when_off: !input skip_when_off
+  enable_window: !input enable_window_detection
+  window_sensors: !input window_sensors
+
+  # Entity selectors may return a string (single) or a list — normalize to lists
+  thermostat_list: >
+    {{ [thermostats] if thermostats is string else (thermostats if thermostats else []) }}
+
+  sensor_list_raw: >
+    {{ [temp_sensors] if temp_sensors is string else (temp_sensors if temp_sensors else []) }}
+
+  # Never feed a TRV its own onboard sensor (would defeat external sensing)
+  sensor_list: >
+    {% set ns = namespace(sensors=[]) %}
+    {% for sensor in sensor_list_raw %}
+      {% set sensor_device = device_id(sensor) %}
+      {% set own = namespace(match=false) %}
+      {% for thermostat in thermostat_list %}
+        {% if sensor_device and device_id(thermostat) == sensor_device %}
+          {% set own.match = true %}
+        {% endif %}
+      {% endfor %}
+      {% if not own.match %}
+        {% set ns.sensors = ns.sensors + [sensor] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.sensors }}
+
+  window_sensor_list: >
+    {{ [window_sensors] if window_sensors is string else (window_sensors if window_sensors else []) }}
+
+  # Swap inverted min/max so a bad config cannot break validation entirely
+  temp_min_valid: >
+    {{ temp_min if temp_min < temp_max else temp_max - 1 }}
+
+  temp_max_valid: >
+    {{ temp_max if temp_max > temp_min else temp_min + 1 }}
+
+  # TRVZB failsafe ~2h without an external update → re-push on schedule even if unchanged.
+  # Interval fires at :00 and :30; we only force once at second 0 of matching minutes.
+  force_temp_refresh: >
+    {{ trigger.id in ['interval', 'ha_start'] and
+       (
+         trigger.id == 'ha_start' or
+         (now().minute % (failsafe_refresh_minutes | int) == 0 and now().second | int == 0)
+       ) }}
+
+  # Discover per-device entities by stable name suffixes (Z2M + ZHA differ here)
+  detected_entities: >
+    {% set ns = namespace(inputs=[], selects=[], zha_ext=[], switches=[]) %}
+    {% for thermostat in thermostat_list %}
+      {% set did = device_id(thermostat) %}
+      {% if did %}
+        {% for entity in device_entities(did) %}
+          {% set domain = entity.split('.')[0] %}
+          {% if domain == 'number' and (
+                entity.endswith('_external_temperature_input') or
+                entity.endswith('_external_temperature_sensor_value')
+             ) %}
+            {% set ns.inputs = ns.inputs + [entity] %}
+          {% elif domain == 'select' and entity.endswith('_temperature_sensor_select') %}
+            {% set ns.selects = ns.selects + [entity] %}
+          {% elif domain == 'switch' and entity.endswith('_external_temperature_sensor') %}
+            {% set ns.zha_ext = ns.zha_ext + [entity] %}
+          {% elif domain == 'switch' and 'open_window' in entity %}
+            {% set ns.switches = ns.switches + [entity] %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    {{ {
+      'inputs': ns.inputs,
+      'selects': ns.selects,
+      'zha_ext': ns.zha_ext,
+      'switches': ns.switches
+    } }}
+
+  temp_input_list: "{{ detected_entities.inputs }}"
+  temp_sensor_select_list: "{{ detected_entities.selects }}"
+  zha_ext_switch_list: "{{ detected_entities.zha_ext }}"
+  window_switch_list: "{{ detected_entities.switches }}"
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  # Heartbeat for recovery + failsafe refresh timing
+  - trigger: time_pattern
+    seconds: "/30"
+    id: interval
+
+  - trigger: homeassistant
+    event: start
+    id: ha_start
+
+  - trigger: state
+    entity_id: !input temp_sensors
+    id: sensor_change
+    not_to:
+      - unavailable
+      - unknown
+
+  - trigger: state
+    entity_id: !input thermostats
+    attribute: temperature
+    id: target_temp_change
+
+  # Re-run detection when a TRV comes back online
+  - trigger: state
+    entity_id: !input thermostats
+    id: thermostat_state
+    not_to:
+      - unavailable
+      - unknown
+
+  # Disabled entirely when window detection is off (enabled is load-time only)
+  - trigger: state
+    entity_id: !input window_sensors
+    id: window_change
+    enabled: !input enable_window_detection
+    not_to:
+      - unavailable
+      - unknown
+
+conditions:
+  - condition: template
+    value_template: "{{ thermostat_list | length > 0 }}"
+
+actions:
+  # --- Window first: stop so we do not also push temperatures on the same run ---
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: window_change
+          - condition: template
+            value_template: >
+              {{ enable_window and
+                 window_switch_list | length > 0 and
+                 window_sensor_list | length > 0 }}
+        sequence:
+          - variables:
+              any_window_open: >
+                {{ expand(window_sensor_list)
+                   | rejectattr('state', 'in', ['unavailable', 'unknown', 'none', ''])
+                   | selectattr('state', 'in', ['on', 'open'])
+                   | list | count > 0 }}
+
+          - repeat:
+              for_each: "{{ window_switch_list }}"
+              sequence:
+                - condition: template
+                  value_template: >
+                    {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] and
+                       states(repeat.item) != ('on' if any_window_open else 'off') }}
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ any_window_open }}"
+                      sequence:
+                        - action: switch.turn_on
+                          target:
+                            entity_id: "{{ repeat.item }}"
+                  default:
+                    - action: switch.turn_off
+                      target:
+                        entity_id: "{{ repeat.item }}"
+
+          - stop: "Window state changed - heating control updated"
+
+  # --- Average external temperature (°F / K → °C; TRVZB always expects Celsius) ---
+  - variables:
+      valid_temps: >
+        {% set ns = namespace(temps=[]) %}
+        {% for sensor in sensor_list %}
+          {% set temp_state = states(sensor) %}
+          {% if is_number(temp_state) %}
+            {% set unit = state_attr(sensor, 'unit_of_measurement') %}
+            {% set raw = temp_state | float %}
+            {% if unit == '°F' %}
+              {% set temp = (raw - 32) * 5 / 9 %}
+            {% elif unit == 'K' %}
+              {% set temp = raw - 273.15 %}
+            {% else %}
+              {% set temp = raw %}
+            {% endif %}
+            {% if temp >= temp_min_valid and temp <= temp_max_valid %}
+              {% set ns.temps = ns.temps + [temp] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.temps }}
+
+      avg_temp: >
+        {% if valid_temps | length > 0 %}
+          {{ (valid_temps | sum / valid_temps | length) | round(round_precision) }}
+        {% else %}
+          {{ 0 }}
+        {% endif %}
+
+      has_valid_sensors: >
+        {{ valid_temps | length > 0 and temp_input_list | length > 0 }}
+
+      has_mode_control: >
+        {{ temp_sensor_select_list | length > 0 or zha_ext_switch_list | length > 0 }}
+
+  # --- External vs internal mode + push temperature ---
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ has_valid_sensors }}"
+        sequence:
+          # Z2M: option names vary by Z2M/firmware version
+          - repeat:
+              for_each: "{{ temp_sensor_select_list }}"
+              sequence:
+                - variables:
+                    parent_climate: >
+                      {% set did = device_id(repeat.item) %}
+                      {% set climates = (device_entities(did) if did else [])
+                         | select('match', '^climate\\.') | list %}
+                      {{ climates[0] if climates else '' }}
+                    climate_allows_update: >
+                      {{ not skip_when_off or parent_climate == '' or
+                         states(parent_climate) not in ['off', 'unavailable', 'unknown'] }}
+                    select_options: "{{ state_attr(repeat.item, 'options') or [] }}"
+                    external_option: >
+                      {{ 'remote_temperature' if 'remote_temperature' in select_options else 'external' }}
+                    # external_3 = recovered from failsafe; leave as "already external"
+                    # external_2 / remote_source_offline = failsafe → force back to external
+                    already_external: >
+                      {{ states(repeat.item) in [
+                           'external', 'remote_temperature', 'external_3'
+                         ] }}
+                - condition: template
+                  value_template: >
+                    {{ climate_allows_update and
+                       states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] and
+                       not already_external }}
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    option: "{{ external_option }}"
+
+          # ZHA uses a switch instead of a select for external mode
+          - repeat:
+              for_each: "{{ zha_ext_switch_list }}"
+              sequence:
+                - variables:
+                    parent_climate: >
+                      {% set did = device_id(repeat.item) %}
+                      {% set climates = (device_entities(did) if did else [])
+                         | select('match', '^climate\\.') | list %}
+                      {{ climates[0] if climates else '' }}
+                    climate_allows_update: >
+                      {{ not skip_when_off or parent_climate == '' or
+                         states(parent_climate) not in ['off', 'unavailable', 'unknown'] }}
+                - condition: template
+                  value_template: >
+                    {{ climate_allows_update and
+                       states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] and
+                       not is_state(repeat.item, 'on') }}
+                - action: switch.turn_on
+                  target:
+                    entity_id: "{{ repeat.item }}"
+
+          # Skip identical values unless failsafe refresh is due (saves Zigbee traffic)
+          - repeat:
+              for_each: "{{ temp_input_list }}"
+              sequence:
+                - variables:
+                    parent_climate: >
+                      {% set did = device_id(repeat.item) %}
+                      {% set climates = (device_entities(did) if did else [])
+                         | select('match', '^climate\\.') | list %}
+                      {{ climates[0] if climates else '' }}
+                    climate_allows_update: >
+                      {{ not skip_when_off or parent_climate == '' or
+                         states(parent_climate) not in ['off', 'unavailable', 'unknown'] }}
+                    current_value: "{{ states(repeat.item) | float(-999) }}"
+                - condition: template
+                  value_template: >
+                    {{ climate_allows_update and
+                       states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] and
+                       (current_value != avg_temp | float or force_temp_refresh) }}
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    value: "{{ avg_temp }}"
+
+      # All external sources gone → fall back so the TRV keeps regulating
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ not has_valid_sensors and has_mode_control }}
+        sequence:
+          - repeat:
+              for_each: "{{ temp_sensor_select_list }}"
+              sequence:
+                - variables:
+                    parent_climate: >
+                      {% set did = device_id(repeat.item) %}
+                      {% set climates = (device_entities(did) if did else [])
+                         | select('match', '^climate\\.') | list %}
+                      {{ climates[0] if climates else '' }}
+                    climate_allows_update: >
+                      {{ not skip_when_off or parent_climate == '' or
+                         states(parent_climate) not in ['off', 'unavailable', 'unknown'] }}
+                    select_options: "{{ state_attr(repeat.item, 'options') or [] }}"
+                    internal_option: >
+                      {{ 'local_temperature' if 'local_temperature' in select_options else 'internal' }}
+                    already_internal: >
+                      {{ states(repeat.item) in ['internal', 'local_temperature'] }}
+                - condition: template
+                  value_template: >
+                    {{ climate_allows_update and
+                       states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] and
+                       not already_internal }}
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    option: "{{ internal_option }}"
+
+          - repeat:
+              for_each: "{{ zha_ext_switch_list }}"
+              sequence:
+                - variables:
+                    parent_climate: >
+                      {% set did = device_id(repeat.item) %}
+                      {% set climates = (device_entities(did) if did else [])
+                         | select('match', '^climate\\.') | list %}
+                      {{ climates[0] if climates else '' }}
+                    climate_allows_update: >
+                      {{ not skip_when_off or parent_climate == '' or
+                         states(parent_climate) not in ['off', 'unavailable', 'unknown'] }}
+                - condition: template
+                  value_template: >
+                    {{ climate_allows_update and
+                       states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] and
+                       not is_state(repeat.item, 'off') }}
+                - action: switch.turn_off
+                  target:
+                    entity_id: "{{ repeat.item }}"
+
+  # --- Multi-TRV setpoint sync (only on dial / target-temp trigger) ---
+  - condition: trigger
+    id: target_temp_change
+
+  - condition: template
+    value_template: >
+      {{ sync_target_temp and
+         thermostat_list | length > 1 and
+         trigger.entity_id is defined and
+         trigger.entity_id in thermostat_list and
+         trigger.to_state is defined and
+         trigger.to_state.attributes.temperature is defined }}
+
+  - variables:
+      triggered_thermostat: "{{ trigger.entity_id }}"
+      new_target_temp_raw: "{{ trigger.to_state.attributes.temperature | float(0) }}"
+      # TRVZB setpoint range is roughly 5–35 °C; reject garbage / cleared attributes
+      new_target_temp: >
+        {% set temp = new_target_temp_raw %}
+        {% if temp > 0 and temp >= 5 and temp <= 35 %}
+          {{ temp }}
+        {% else %}
+          {{ 0 }}
+        {% endif %}
+
+  - condition: template
+    value_template: "{{ new_target_temp | float(0) > 0 }}"
+
+  - repeat:
+      for_each: "{{ thermostat_list }}"
+      sequence:
+        - condition: template
+          value_template: >
+            {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] }}
+
+        - variables:
+            current_temp: "{{ state_attr(repeat.item, 'temperature') | float(0) }}"
+
+        # Skip self + unchanged values to avoid sync loops under mode: restart
+        - condition: template
+          value_template: >
+            {{ repeat.item != triggered_thermostat and
+               current_temp != new_target_temp }}
+
+        - action: climate.set_temperature
+          target:
+            entity_id: "{{ repeat.item }}"
+          data:
+            temperature: "{{ new_target_temp }}"
