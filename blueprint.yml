@@ -1,0 +1,185 @@
+blueprint:
+  name: Sonoff Thermostat Sync
+  description: >
+    Synchronisiert einen externen Temperatursensor mit einem Sonoff Thermostat.
+    
+    **Features:**
+    - Automatische Temperaturübertragung vom externen Sensor zum Thermostat
+    - Optional: Fenster-Erkennung für automatische Heizungssteuerung
+    - Konfigurierbare Update-Intervalle und Temperatur-Grenzen
+    
+    Dieses Blueprint wird pro Thermostat einmal als Automation hinzugefügt.
+  domain: automation
+  author: Your Name
+  source_url: https://github.com/yourusername/home-assistant-blueprints/blob/main/sonoff_thermostat_sync.yaml
+  homeassistant:
+    min_version: 2024.6.0
+  
+  input:
+    # ==================== THERMOSTAT ====================
+    thermostat_section:
+      name: Thermostat Konfiguration
+      icon: mdi:thermostat
+      description: Wähle das Thermostat und die zugehörigen Sensoren
+      input:
+        thermostat:
+          name: Thermostat
+          description: Das Sonoff Thermostat (climate entity)
+          selector:
+            entity:
+              filter:
+                - domain: climate
+        
+        temp_input:
+          name: External Temperature Input
+          description: >
+            Die "External Temperature Input" Entität des Sonoff Thermostats.
+            Diese wird mit der Temperatur des externen Sensors synchronisiert.
+          selector:
+            entity:
+              filter:
+                - domain: number
+        
+        temp_sensor:
+          name: Temperatursensor
+          description: >
+            Der externe Temperatursensor (z.B. Aqara, Zigbee Sensor).
+            Dieser Sensor ist in der Regel genauer als der interne Sensor des Thermostats.
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                device_class: temperature
+    
+    # ==================== EINSTELLUNGEN ====================
+    settings_section:
+      name: Einstellungen
+      icon: mdi:cog
+      description: Konfiguriere das Verhalten der Synchronisierung
+      collapsed: true
+      input:
+        update_interval:
+          name: Update Interval
+          description: Wie oft soll die Temperatur synchronisiert werden (in Sekunden)
+          default: 30
+          selector:
+            number:
+              min: 10
+              max: 300
+              step: 5
+              unit_of_measurement: s
+              mode: slider
+        
+        temp_min:
+          name: Minimale Temperatur
+          description: Temperaturwerte unter diesem Wert werden als ungültig ignoriert
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 15
+              step: 1
+              unit_of_measurement: °C
+        
+        temp_max:
+          name: Maximale Temperatur
+          description: Temperaturwerte über diesem Wert werden als ungültig ignoriert
+          default: 50
+          selector:
+            number:
+              min: 30
+              max: 60
+              step: 1
+              unit_of_measurement: °C
+    
+    # ==================== FENSTER-ERKENNUNG (Optional) ====================
+    window_section:
+      name: Fenster-Erkennung (Optional)
+      icon: mdi:window-open
+      description: >
+        Automatische Heizungssteuerung bei offenen Fenstern.
+        Das Thermostat wird benachrichtigt, wenn ein Fenster geöffnet wird.
+      collapsed: true
+      input:
+        enable_window_detection:
+          name: Fenster-Erkennung aktivieren
+          description: Aktiviere die automatische Erkennung offener Fenster
+          default: false
+          selector:
+            boolean:
+        
+        window_switch:
+          name: Window Switch
+          description: >
+            Die "Open Window Switch" Entität des Sonoff Thermostats.
+            Wird automatisch aktiviert, wenn ein Fenster geöffnet ist.
+          default: {}
+          selector:
+            entity:
+              filter:
+                - domain: switch
+        
+        window_sensors:
+          name: Fensterkontakte
+          description: >
+            Wähle alle Fenster- und Türkontakte für diesen Raum.
+            Sobald einer davon geöffnet wird, wird der Window Switch aktiviert.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+                  device_class:
+                    - window
+                    - door
+                    - opening
+              multiple: true
+
+variables:
+  temp_sensor: !input temp_sensor
+  temp_input: !input temp_input
+  thermostat: !input thermostat
+  temp_min: !input temp_min
+  temp_max: !input temp_max
+  enable_window: !input enable_window_detection
+  window_switch: !input window_switch
+  window_sensors: !input window_sensors
+
+triggers:
+  - trigger: time_pattern
+    seconds: "/30"
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id: !input temp_sensor
+
+condition: []
+
+actions:
+  # ==================== TEMPERATUR SYNC ====================
+        - variables:
+      current_temp: "{{ states(temp_sensor) | float(0) }}"
+  
+        - condition: template
+    value_template: "{{ current_temp >= temp_min and current_temp <= temp_max }}"
+  
+  - action: number.set_value
+          target:
+            entity_id: "{{ temp_input }}"
+          data:
+            value: "{{ current_temp | round(1) }}"
+
+  # ==================== FENSTER-ERKENNUNG ====================
+  - condition: template
+    value_template: "{{ enable_window and window_switch and window_sensors and window_sensors | length > 0 }}"
+  
+        - variables:
+      any_window_open: >
+        {{ expand(window_sensors) | selectattr('state', 'in', ['on', 'open']) | list | count > 0 }}
+  
+  - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
+          target:
+            entity_id: "{{ window_switch }}"
+
+mode: single
+max_exceeded: silent
