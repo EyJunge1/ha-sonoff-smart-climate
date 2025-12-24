@@ -11,7 +11,7 @@ blueprint:
     Dieses Blueprint wird pro Thermostat einmal als Automation hinzugefügt.
   domain: automation
   author: Your Name
-  source_url: https://github.com/yourusername/home-assistant-blueprints/blob/main/sonoff_thermostat_sync.yaml
+  source_url: https://github.com/eyjunge1/ha-sonoff-smart-climate/blob/main/blueprint.yml
   homeassistant:
     min_version: 2024.6.0
   
@@ -157,29 +157,29 @@ condition: []
 
 actions:
   # ==================== TEMPERATUR SYNC ====================
-        - variables:
+  - variables:
       current_temp: "{{ states(temp_sensor) | float(0) }}"
   
-        - condition: template
+  - condition: template
     value_template: "{{ current_temp >= temp_min and current_temp <= temp_max }}"
   
   - action: number.set_value
-          target:
-            entity_id: "{{ temp_input }}"
-          data:
-            value: "{{ current_temp | round(1) }}"
-
+    target:
+      entity_id: "{{ temp_input }}"
+    data:
+      value: "{{ current_temp | round(1) }}"
+  
   # ==================== FENSTER-ERKENNUNG ====================
   - condition: template
     value_template: "{{ enable_window and window_switch and window_sensors and window_sensors | length > 0 }}"
   
-        - variables:
+  - variables:
       any_window_open: >
         {{ expand(window_sensors) | selectattr('state', 'in', ['on', 'open']) | list | count > 0 }}
   
   - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
-          target:
-            entity_id: "{{ window_switch }}"
+    target:
+      entity_id: "{{ window_switch }}"
 
 mode: single
 max_exceeded: silent
