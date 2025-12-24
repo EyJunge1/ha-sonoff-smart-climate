@@ -1,6 +1,12 @@
 # 🌡️ Sonoff Smart Climate - Home Assistant Blueprint
 
-Ein Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Thermostaten mit externen Temperatursensoren und optionaler Fenster-Erkennung.
+Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Thermostaten mit externen Temperatursensoren und optionaler Fenster-Erkennung.
+
+**Funktioniert für:**
+- 🏠 Einzelne Räume mit einem Thermostat
+- 🏘️ Große Räume mit mehreren Thermostaten
+- 📊 Einen oder mehrere Temperatursensoren (Durchschnitt bei mehreren)
+- 🪟 Optionale Fenster-Erkennung
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6.0+-blue.svg)](https://www.home-assistant.io/)
 [![Blueprint](https://img.shields.io/badge/Blueprint-automation-orange.svg)](https://www.home-assistant.io/docs/automation/using_blueprints/)
@@ -11,32 +17,33 @@ Ein Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Thermostaten
 - [Features](#-features)
 - [Voraussetzungen](#-voraussetzungen)
 - [Installation](#-installation)
-- [Konfiguration](#️-konfiguration)
 - [Verwendung](#-verwendung)
 - [Beispiele](#-beispiele)
 - [Fehlerbehebung](#-fehlerbehebung)
 - [FAQ](#-faq)
 - [Changelog](#-changelog)
-- [Lizenz](#-lizenz)
 
 ## ✨ Features
 
-### 🌡️ Temperatur-Synchronisation
-- **Automatische Übertragung** von externen Temperatursensoren zu Sonoff Thermostaten
-- **Präzisere Temperaturmessung** durch Nutzung genauerer externer Sensoren (z.B. Aqara, Zigbee)
+### 🌡️ Intelligente Temperatur-Steuerung
+- **Ein oder mehrere Thermostate** - Flexibel für jeden Raum
+- **Ein oder mehrere Sensoren** - Bei mehreren wird automatisch der Durchschnitt berechnet
+- **Präzise Messung** durch externe Sensoren (Aqara, Zigbee, etc.)
 - **Echtzeit-Updates** bei Temperaturänderungen
 - **Validierung** der Temperaturwerte (Min/Max-Grenzen)
 
 ### 🪟 Fenster-Erkennung (Optional)
 - **Automatische Heizungssteuerung** bei offenen Fenstern
-- **Multi-Sensor-Support** - Überwacht mehrere Fenster/Türen pro Raum
+- **Multi-Sensor-Support** - Überwacht mehrere Fenster/Türen
 - **Intelligente Steuerung** des "Open Window Switch" am Thermostat
+- Bei mehreren Thermostaten: **EINES offen = ALLE informiert**
 
 ### ⚙️ Flexibel & Konfigurierbar
 - **Einstellbares Update-Interval** (10-300 Sekunden)
 - **Anpassbare Temperatur-Grenzen** für Validierung
+- **Rundungs-Präzision** konfigurierbar (0-2 Nachkommastellen)
 - **Übersichtliche UI** mit zusammenklappbaren Sektionen
-- **Pro-Thermostat-Setup** - Ein Blueprint, mehrfach verwendbar
+- **Ein Blueprint für alles** - Kein separates Blueprint für Zonen nötig
 
 ## 🔧 Voraussetzungen
 
@@ -66,163 +73,189 @@ Ein Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Thermostaten
 3. Erstelle den Ordner falls er nicht existiert
 4. Starte Home Assistant neu oder lade die Automationen neu
 
-## ⚙️ Konfiguration
-
-### Schritt 1: Blueprint hinzufügen
-
-1. Gehe zu: **Einstellungen** → **Automationen & Szenen** → **Blueprints**
-2. Finde "Sonoff Thermostat Sync" und klicke auf **Automation erstellen**
-
-### Schritt 2: Thermostat Konfiguration
-
-| Feld | Beschreibung | Erforderlich |
-|------|--------------|--------------|
-| **Thermostat** | Dein Sonoff Thermostat (climate entity) | ✅ Ja |
-| **External Temperature Input** | Die "External Temperature Input" Number-Entity des Thermostats | ✅ Ja |
-| **Temperatursensor** | Dein externer Temperatursensor (sensor entity) | ✅ Ja |
-
-### Schritt 3: Einstellungen (Optional)
-
-| Feld | Standard | Beschreibung |
-|------|----------|--------------|
-| **Update Interval** | 30s | Wie oft die Temperatur synchronisiert wird (10-300s) |
-| **Minimale Temperatur** | 0°C | Untere Grenze für gültige Temperaturwerte |
-| **Maximale Temperatur** | 50°C | Obere Grenze für gültige Temperaturwerte |
-
-### Schritt 4: Fenster-Erkennung (Optional)
-
-| Feld | Beschreibung | Erforderlich |
-|------|--------------|--------------|
-| **Fenster-Erkennung aktivieren** | Toggle zum Aktivieren | ❌ Nein |
-| **Window Switch** | Die "Open Window Switch" Switch-Entity des Thermostats | Nur wenn aktiviert |
-| **Fensterkontakte** | Alle Fenster-/Türsensoren für den Raum | Nur wenn aktiviert |
-
 ## 🎯 Verwendung
 
 ### Einzelnes Thermostat einrichten
 
 1. Erstelle eine neue Automation aus dem Blueprint
-2. Gib ihr einen aussagekräftigen Namen (z.B. "Wohnzimmer Thermostat Sync")
-3. Konfiguriere die erforderlichen Felder
-4. Speichern & aktivieren
+2. Gib ihr einen aussagekräftigen Namen (z.B. "Wohnzimmer Thermostat")
+3. Wähle **ein** Thermostat, **einen** Temp Input, **einen** Sensor
+4. Optional: Aktiviere Fenster-Erkennung
+5. Speichern & aktivieren
 
-### Mehrere Thermostate
+### Mehrere Thermostate (große Räume/Zonen)
 
-Für jeden Raum/Thermostat:
-- Erstelle eine **separate Automation** aus demselben Blueprint
-- Jede kann **individuell konfiguriert** werden (verschiedene Intervalle, mit/ohne Fenster-Erkennung)
-
-**Beispiel-Setup:**
-- ✅ Automation 1: "Wohnzimmer Thermostat" (mit Fenster-Erkennung)
-- ✅ Automation 2: "Schlafzimmer Thermostat" (mit Fenster-Erkennung)
-- ✅ Automation 3: "Badezimmer Thermostat" (ohne Fenster-Erkennung)
+1. Erstelle eine neue Automation aus dem Blueprint
+2. Gib ihr einen Namen (z.B. "Wohnzimmer Zone - 3 Heizkörper")
+3. Wähle **mehrere** Thermostate und entsprechende Temp Inputs
+4. Wähle einen oder **mehrere** Temperatursensoren (Durchschnitt wird berechnet)
+5. Optional: Aktiviere Fenster-Erkennung mit mehreren Window Switches
+6. **WICHTIG:** Reihenfolge bei Thermostaten/Inputs/Switches muss übereinstimmen!
 
 ## 💡 Beispiele
 
-### Beispiel 1: Einfaches Setup (ohne Fenster-Erkennung)
+### Beispiel 1: Einzelnes Thermostat (einfachster Fall)
 
 ```yaml
-alias: Wohnzimmer Thermostat Sync
+alias: Schlafzimmer Thermostat
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
-    thermostat: climate.wohnzimmer_thermostat
-    temp_input: number.wohnzimmer_external_temp
-    temp_sensor: sensor.wohnzimmer_temperatur
-    update_interval: 30
+    thermostats: climate.schlafzimmer_thermostat
+    temp_inputs: number.schlafzimmer_external_temp
+    temp_sensors: sensor.schlafzimmer_temperatur
 ```
 
-### Beispiel 2: Mit Fenster-Erkennung
+### Beispiel 2: Einzelnes Thermostat mit Fenster-Erkennung
 
 ```yaml
-alias: Schlafzimmer Thermostat Sync
+alias: Kinderzimmer Thermostat
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
-    thermostat: climate.schlafzimmer_thermostat
-    temp_input: number.schlafzimmer_external_temp
-    temp_sensor: sensor.schlafzimmer_temperatur
+    thermostats: climate.kinderzimmer_thermostat
+    temp_inputs: number.kinderzimmer_external_temp
+    temp_sensors: sensor.kinderzimmer_temperatur
     enable_window_detection: true
-    window_switch: switch.schlafzimmer_open_window
+    window_switches: switch.kinderzimmer_open_window
     window_sensors:
-      - binary_sensor.schlafzimmer_fenster_1
-      - binary_sensor.schlafzimmer_fenster_2
+      - binary_sensor.kinderzimmer_fenster
 ```
 
-### Beispiel 3: Angepasste Einstellungen
+### Beispiel 3: Großes Wohnzimmer - 3 Thermostate, 2 Sensoren
 
 ```yaml
-alias: Badezimmer Thermostat Sync
+alias: Wohnzimmer Zone
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
-    thermostat: climate.badezimmer_thermostat
-    temp_input: number.badezimmer_external_temp
-    temp_sensor: sensor.badezimmer_temperatur
-    update_interval: 60  # Längeres Interval
-    temp_min: 10         # Höhere Minimaltemperatur
-    temp_max: 35         # Niedrigere Maximaltemperatur
+    thermostats:
+      - climate.wohnzimmer_heizkoerper_1
+      - climate.wohnzimmer_heizkoerper_2
+      - climate.wohnzimmer_heizkoerper_3
+    temp_inputs:
+      - number.wohnzimmer_external_temp_1
+      - number.wohnzimmer_external_temp_2
+      - number.wohnzimmer_external_temp_3
+    temp_sensors:
+      - sensor.wohnzimmer_temp_ecke_links  # 20.5°C
+      - sensor.wohnzimmer_temp_ecke_rechts # 21.0°C
+    # Durchschnitt: 20.75°C wird an alle 3 Thermostate gesendet
 ```
+
+**So funktioniert's:**
+- Sensor 1: 20.5°C, Sensor 2: 21.0°C → **Durchschnitt: 20.75°C**
+- Alle 3 Thermostate bekommen 20.75°C
+
+### Beispiel 4: Offener Wohnbereich mit Fenster-Erkennung
+
+```yaml
+alias: Offener Wohnbereich
+use_blueprint:
+  path: sonoff_smart_climate/blueprint.yml
+  input:
+    thermostats:
+      - climate.wohnzimmer_thermostat
+      - climate.kueche_thermostat
+      - climate.essbereich_thermostat
+    temp_inputs:
+      - number.wohnzimmer_external_temp
+      - number.kueche_external_temp
+      - number.essbereich_external_temp
+    temp_sensors:
+      - sensor.wohnzimmer_temperatur
+      - sensor.kueche_temperatur
+      - sensor.essbereich_temperatur
+    enable_window_detection: true
+    window_switches:
+      - switch.wohnzimmer_window
+      - switch.kueche_window
+      - switch.essbereich_window
+    window_sensors:
+      - binary_sensor.wohnzimmer_fenster_1
+      - binary_sensor.wohnzimmer_fenster_2
+      - binary_sensor.kueche_fenster
+      - binary_sensor.terrassentuer
+    update_interval: 45
+    round_precision: 1
+```
+
+**Fenster-Logik:**
+- Terrassentür öffnet → **ALLE** 3 Window Switches gehen AN
+- Alle Fenster zu → **ALLE** 3 Window Switches gehen AUS
 
 ## 🔍 Fehlerbehebung
 
 ### Problem: Temperatur wird nicht übertragen
 
 **Lösung:**
-1. Prüfe ob der externe Sensor funktioniert und Werte liefert
+1. Prüfe ob die externen Sensoren funktionieren und Werte liefern
 2. Überprüfe die Entity-IDs in der Automation
 3. Schaue in die Logs: **Einstellungen** → **System** → **Protokolle**
 4. Stelle sicher, dass die Temperatur zwischen Min/Max liegt
+
+### Problem: Bei mehreren Thermostaten funktioniert nur eines
+
+**Lösung:**
+1. Prüfe die **Reihenfolge** von Thermostaten, Temp Inputs und Window Switches
+2. Die Position muss übereinstimmen:
+   - Position 1: Thermostat 1 ↔ Temp Input 1 ↔ Window Switch 1
+   - Position 2: Thermostat 2 ↔ Temp Input 2 ↔ Window Switch 2
+3. Gleiche **Anzahl** von Thermostaten und Temp Inputs erforderlich
 
 ### Problem: Fenster-Erkennung funktioniert nicht
 
 **Lösung:**
 1. Aktiviere "Fenster-Erkennung aktivieren"
-2. Stelle sicher, dass Window Switch und Fensterkontakte konfiguriert sind
+2. Stelle sicher, dass Window Switches und Fenstersensoren konfiguriert sind
 3. Prüfe ob die Fenstersensoren den korrekten Status melden (`on`/`open` für offen)
 
-### Problem: "Max exceeded" Fehler
+### Problem: Durchschnittstemperatur scheint falsch
 
 **Lösung:**
-- Das ist normal bei schnellen Temperaturänderungen
-- Die Automation hat `max_exceeded: silent` - Fehler werden ignoriert
-- Erhöhe ggf. das Update-Interval
-
-### Problem: Blueprint erscheint nicht nach Import
-
-**Lösung:**
-1. Lade Automationen neu: **Entwicklerwerkzeuge** → **YAML** → **Automationen neu laden**
-2. Prüfe die Home Assistant Version (min. 2024.6.0)
-3. Überprüfe Syntax-Fehler in der blueprint.yml
+1. Überprüfe ob alle Sensoren gültige Werte liefern (nicht `unavailable` oder `unknown`)
+2. Ungültige Werte werden automatisch ignoriert - prüfe ob genug Sensoren verfügbar sind
+3. Ändere `round_precision` falls mehr/weniger Genauigkeit gewünscht ist
 
 ## ❓ FAQ
 
+**F: Kann ich nur ein Thermostat steuern?**  
+A: Ja! Wähle einfach ein Thermostat, einen Temp Input und einen Sensor. Das Blueprint funktioniert für beides.
+
 **F: Kann ich mehrere Thermostate mit einem Blueprint steuern?**  
-A: Nein. Das Design ist bewusst "ein Blueprint = ein Thermostat". Erstelle für jeden Raum eine separate Automation. Das macht die Konfiguration einfacher und flexibler.
+A: Ja! Wähle einfach mehrere Thermostate und entsprechende Temp Inputs. Alle werden synchron mit der gleichen Temperatur versorgt.
+
+**F: Wie funktioniert die Durchschnittsberechnung?**  
+A: Alle gültigen Temperatursensoren werden addiert und durch die Anzahl geteilt. Ungültige Werte (`unavailable`, außerhalb Min/Max) werden automatisch ignoriert.
+
+**F: Müssen die Reihenfolgen übereinstimmen?**  
+A: Ja! Bei mehreren Thermostaten:
+- Thermostat 1 → Temp Input 1 → Window Switch 1
+- Thermostat 2 → Temp Input 2 → Window Switch 2
+- usw.
+
+**F: Was passiert wenn ein Sensor offline geht?**  
+A: Der Blueprint ignoriert ungültige Werte automatisch. Solange mindestens ein Sensor gültige Werte liefert, funktioniert die Automation.
+
+**F: Muss ich die Fenster-Erkennung nutzen?**  
+A: Nein, sie ist komplett optional. Du kannst sie aktivieren oder deaktivieren.
 
 **F: Welche Sonoff Thermostate werden unterstützt?**  
 A: Alle Sonoff Thermostate die "External Temperature Input" unterstützen, z.B. TRVZB, NSPanel Thermostat.
 
-**F: Funktioniert das mit anderen Thermostat-Marken?**  
-A: Theoretisch ja, wenn sie eine "External Temperature Input" Number-Entity haben. Wurde aber primär für Sonoff entwickelt.
-
-**F: Wie oft wird die Temperatur synchronisiert?**  
-A: Standard ist alle 30 Sekunden, aber auch bei jeder Temperaturänderung (State-Trigger). Du kannst das Interval von 10-300 Sekunden einstellen.
-
-**F: Was passiert wenn mein Sensor offline geht?**  
-A: Der Blueprint prüft ob die Temperatur zwischen Min/Max liegt. Ungültige Werte (0 oder unavailable) werden ignoriert.
-
-**F: Muss ich die Fenster-Erkennung nutzen?**  
-A: Nein, sie ist komplett optional. Du kannst sie aktivieren oder deaktivieren.
+**F: Kann ich verschiedene Update-Intervalle pro Raum haben?**  
+A: Ja! Erstelle separate Automationen mit unterschiedlichen Einstellungen.
 
 ## 📝 Changelog
 
 ### Version 1.0.0 (2025-01-XX)
 - 🎉 Erste öffentliche Version
-- ✨ Temperatur-Synchronisation
-- ✨ Fenster-Erkennung
+- ✨ **Flexibles Blueprint** für einzelne oder mehrere Thermostate
+- ✨ Durchschnittstemperatur aus mehreren Sensoren
+- ✨ Gemeinsame Fenster-Erkennung für Zonen
 - ✨ Konfigurierbare Einstellungen
 - ✨ Input Sections für bessere UX
+- 📖 Umfangreiche Dokumentation
 
 ## 📄 Lizenz
 

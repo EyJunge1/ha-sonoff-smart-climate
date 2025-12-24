@@ -1,16 +1,17 @@
 blueprint:
-  name: Sonoff Thermostat Sync
+  name: Sonoff Smart Climate Control
   description: >
-    Synchronisiert einen externen Temperatursensor mit einem Sonoff Thermostat.
+    Intelligente Steuerung von Sonoff Thermostaten mit externen Temperatursensoren.
     
     **Features:**
-    - Automatische Temperaturübertragung vom externen Sensor zum Thermostat
+    - Einzelnes oder mehrere Thermostate steuern
+    - Ein oder mehrere Temperatursensoren (Durchschnitt bei mehreren)
     - Optional: Fenster-Erkennung für automatische Heizungssteuerung
     - Konfigurierbare Update-Intervalle und Temperatur-Grenzen
     
-    Dieses Blueprint wird pro Thermostat einmal als Automation hinzugefügt.
+    Flexibel für einzelne Räume oder große Zonen mit mehreren Heizkörpern.
   domain: automation
-  author: Your Name
+  author: EyJunge1
   source_url: https://github.com/eyjunge1/ha-sonoff-smart-climate/blob/main/blueprint.yml
   homeassistant:
     min_version: 2024.6.0
@@ -20,36 +21,43 @@ blueprint:
     thermostat_section:
       name: Thermostat Konfiguration
       icon: mdi:thermostat
-      description: Wähle das Thermostat und die zugehörigen Sensoren
+      description: >
+        Wähle ein oder mehrere Thermostate und die zugehörigen Sensoren.
+        Bei mehreren Thermostaten werden alle synchron gesteuert.
       input:
-        thermostat:
-          name: Thermostat
-          description: Das Sonoff Thermostat (climate entity)
+        thermostats:
+          name: Thermostat(e)
+          description: >
+            Ein oder mehrere Sonoff Thermostate.
+            Bei mehreren werden alle mit der gleichen Temperatur versorgt.
           selector:
             entity:
               filter:
                 - domain: climate
+              multiple: true
         
-        temp_input:
-          name: External Temperature Input
+        temp_inputs:
+          name: External Temperature Input(s)
           description: >
-            Die "External Temperature Input" Entität des Sonoff Thermostats.
-            Diese wird mit der Temperatur des externen Sensors synchronisiert.
+            Die "External Temperature Input" Entität(en) der Thermostate.
+            WICHTIG: Reihenfolge muss mit den Thermostaten übereinstimmen!
           selector:
             entity:
               filter:
                 - domain: number
+              multiple: true
         
-        temp_sensor:
-          name: Temperatursensor
+        temp_sensors:
+          name: Temperatursensor(en)
           description: >
-            Der externe Temperatursensor (z.B. Aqara, Zigbee Sensor).
-            Dieser Sensor ist in der Regel genauer als der interne Sensor des Thermostats.
+            Ein oder mehrere externe Temperatursensoren (z.B. Aqara, Zigbee).
+            Bei mehreren wird die Durchschnittstemperatur berechnet.
           selector:
             entity:
               filter:
                 - domain: sensor
-                device_class: temperature
+                  device_class: temperature
+              multiple: true
     
     # ==================== EINSTELLUNGEN ====================
     settings_section:
@@ -91,6 +99,16 @@ blueprint:
               max: 60
               step: 1
               unit_of_measurement: °C
+        
+        round_precision:
+          name: Rundungs-Präzision
+          description: Auf wie viele Nachkommastellen soll gerundet werden
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 2
+              step: 1
     
     # ==================== FENSTER-ERKENNUNG (Optional) ====================
     window_section:
@@ -98,7 +116,7 @@ blueprint:
       icon: mdi:window-open
       description: >
         Automatische Heizungssteuerung bei offenen Fenstern.
-        Das Thermostat wird benachrichtigt, wenn ein Fenster geöffnet wird.
+        Bei mehreren Thermostaten werden alle benachrichtigt.
       collapsed: true
       input:
         enable_window_detection:
@@ -108,22 +126,23 @@ blueprint:
           selector:
             boolean:
         
-        window_switch:
-          name: Window Switch
+        window_switches:
+          name: Window Switch(es)
           description: >
-            Die "Open Window Switch" Entität des Sonoff Thermostats.
-            Wird automatisch aktiviert, wenn ein Fenster geöffnet ist.
-          default: {}
+            Die "Open Window Switch" Entität(en) der Thermostate.
+            WICHTIG: Reihenfolge muss mit den Thermostaten übereinstimmen!
+          default: []
           selector:
             entity:
               filter:
                 - domain: switch
+              multiple: true
         
         window_sensors:
           name: Fensterkontakte
           description: >
-            Wähle alle Fenster- und Türkontakte für diesen Raum.
-            Sobald einer davon geöffnet wird, wird der Window Switch aktiviert.
+            Wähle alle Fenster- und Türkontakte.
+            Sobald einer davon geöffnet wird, werden alle Window Switches aktiviert.
           default: []
           selector:
             entity:
@@ -136,13 +155,14 @@ blueprint:
               multiple: true
 
 variables:
-  temp_sensor: !input temp_sensor
-  temp_input: !input temp_input
-  thermostat: !input thermostat
+  thermostats: !input thermostats
+  temp_inputs: !input temp_inputs
+  temp_sensors: !input temp_sensors
   temp_min: !input temp_min
   temp_max: !input temp_max
+  round_precision: !input round_precision
   enable_window: !input enable_window_detection
-  window_switch: !input window_switch
+  window_switches: !input window_switches
   window_sensors: !input window_sensors
 
 triggers:
@@ -151,35 +171,97 @@ triggers:
   - trigger: homeassistant
     event: start
   - trigger: state
-    entity_id: !input temp_sensor
+    entity_id: !input temp_sensors
 
 condition: []
 
 actions:
-  # ==================== TEMPERATUR SYNC ====================
+  # ==================== DURCHSCHNITTSTEMPERATUR BERECHNEN ====================
   - variables:
-      current_temp: "{{ states(temp_sensor) | float(0) }}"
+      # Sammle alle gültigen Temperaturwerte
+      valid_temps: >
+        {% set ns = namespace(temps=[]) %}
+        {% if temp_sensors is string %}
+          {% set sensor_list = [temp_sensors] %}
+        {% else %}
+          {% set sensor_list = temp_sensors %}
+        {% endif %}
+        {% for sensor in sensor_list %}
+          {% set temp = states(sensor) | float(0) %}
+          {% if temp >= temp_min and temp <= temp_max %}
+            {% set ns.temps = ns.temps + [temp] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.temps }}
+      
+      # Berechne Durchschnitt
+      avg_temp: >
+        {% if valid_temps | length > 0 %}
+          {{ (valid_temps | sum / valid_temps | length) | round(round_precision) }}
+        {% else %}
+          {{ 0 }}
+        {% endif %}
+      
+      # Konvertiere zu Liste falls nötig
+      thermostat_list: >
+        {% if thermostats is string %}
+          {{ [thermostats] }}
+        {% else %}
+          {{ thermostats }}
+        {% endif %}
+      
+      temp_input_list: >
+        {% if temp_inputs is string %}
+          {{ [temp_inputs] }}
+        {% else %}
+          {{ temp_inputs }}
+        {% endif %}
   
+  # Prüfe ob wir gültige Temperaturen haben
   - condition: template
-    value_template: "{{ current_temp >= temp_min and current_temp <= temp_max }}"
+    value_template: "{{ valid_temps | length > 0 and avg_temp | float > 0 }}"
   
-  - action: number.set_value
-    target:
-      entity_id: "{{ temp_input }}"
-    data:
-      value: "{{ current_temp | round(1) }}"
+  # ==================== TEMPERATUR AN ALLE THERMOSTATE SENDEN ====================
+  - repeat:
+      count: "{{ temp_input_list | length }}"
+      sequence:
+        - variables:
+            current_index: "{{ repeat.index - 1 }}"
+            current_temp_input: "{{ temp_input_list[current_index] }}"
+        
+        - action: number.set_value
+          target:
+            entity_id: "{{ current_temp_input }}"
+          data:
+            value: "{{ avg_temp }}"
   
   # ==================== FENSTER-ERKENNUNG ====================
   - condition: template
-    value_template: "{{ enable_window and window_switch and window_sensors and window_sensors | length > 0 }}"
+    value_template: "{{ enable_window and window_switches and window_switches | length > 0 and window_sensors and window_sensors | length > 0 }}"
   
   - variables:
+      # Prüfe ob IRGENDEIN Fenster offen ist
       any_window_open: >
         {{ expand(window_sensors) | selectattr('state', 'in', ['on', 'open']) | list | count > 0 }}
+      
+      window_switch_list: >
+        {% if window_switches is string %}
+          {{ [window_switches] }}
+        {% else %}
+          {{ window_switches }}
+        {% endif %}
   
-  - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
-    target:
-      entity_id: "{{ window_switch }}"
+  # Setze ALLE Window Switches
+  - repeat:
+      count: "{{ window_switch_list | length }}"
+      sequence:
+        - variables:
+            current_index: "{{ repeat.index - 1 }}"
+            current_switch: "{{ window_switch_list[current_index] }}"
+        
+        - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
+          target:
+            entity_id: "{{ current_switch }}"
 
 mode: single
 max_exceeded: silent
