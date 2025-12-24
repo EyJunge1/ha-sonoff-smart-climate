@@ -1,13 +1,13 @@
 # 🌡️ Sonoff Smart Climate - Home Assistant Blueprint
 
-Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Thermostaten mit externen Temperatursensoren und optionaler Fenster-Erkennung.
+A flexible Home Assistant Blueprint for intelligent control of Sonoff thermostats with external temperature sensors and optional window detection.
 
-**Funktioniert für:**
-- 🏠 Einzelne Räume mit einem Thermostat
-- 🏘️ Große Räume mit mehreren Thermostaten
-- 📊 Einen oder mehrere Temperatursensoren (Durchschnitt bei mehreren)
-- 🪟 Optionale Fenster-Erkennung
-- ✨ **NEU:** Automatische Erkennung aller Thermostat-Entitäten!
+**Works for:**
+- 🏠 Single rooms with one thermostat
+- 🏘️ Large rooms with multiple thermostats
+- 📊 One or multiple temperature sensors (average calculated for multiple sensors)
+- 🪟 Optional window detection
+- ✨ **NEW:** Automatic detection of all thermostat entities!
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6.0+-blue.svg)](https://www.home-assistant.io/)
 [![Blueprint](https://img.shields.io/badge/Blueprint-automation-orange.svg)](https://www.home-assistant.io/docs/automation/using_blueprints/)
@@ -15,173 +15,173 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 
 ---
 
-## 📋 Inhaltsverzeichnis
+## 📋 Table of Contents
 
 - [Features](#-features)
-- [Voraussetzungen](#-voraussetzungen)
+- [Requirements](#-requirements)
 - [Installation](#-installation)
-- [Verwendung](#-verwendung)
-- [Beispiele](#-beispiele)
-- [Lizenz](#-lizenz)
+- [Usage](#-usage)
+- [Examples](#-examples)
+- [License](#-license)
 
 ---
 
 ## ✨ Features
 
-### 🌡️ Intelligente Temperatur-Steuerung
-- **Ein oder mehrere Thermostate** - Flexibel für jeden Raum
-- **Ein oder mehrere Sensoren** - Bei mehreren wird automatisch der Durchschnitt berechnet
-- **Präzise Messung** durch externe Sensoren (Aqara, Zigbee, etc.)
-- **Echtzeit-Updates** bei Temperaturänderungen
-- **Validierung** der Temperaturwerte (Min/Max-Grenzen)
+### 🌡️ Intelligent Temperature Control
+- **One or multiple thermostats** - Flexible for any room
+- **One or multiple sensors** - Average automatically calculated for multiple sensors
+- **Precise measurement** through external sensors (Aqara, Zigbee, etc.)
+- **Real-time updates** on temperature changes
+- **Validation** of temperature values (Min/Max limits)
 
-### 🪟 Fenster-Erkennung (Optional)
-- **Automatische Heizungssteuerung** bei offenen Fenstern
-- **Multi-Sensor-Support** - Überwacht mehrere Fenster/Türen
-- **Automatische Erkennung** des "Open Window Switch" am Thermostat
-- Bei mehreren Thermostaten: **EINES offen = ALLE informiert**
+### 🪟 Window Detection (Optional)
+- **Automatic heating control** with open windows
+- **Multi-sensor support** - Monitors multiple windows/doors
+- **Automatic detection** of the "Open Window Switch" on the thermostat
+- For multiple thermostats: **ONE open = ALL notified**
 
-### ⚙️ Flexibel & Konfigurierbar
-- **Automatische Erkennung** - Blueprint findet alle benötigten Entitäten selbst
-- **Einfache Konfiguration** - Nur Thermostate und Sensoren auswählen, den Rest macht das Blueprint
-- **Einstellbares Update-Interval** (10-300 Sekunden)
-- **Anpassbare Temperatur-Grenzen** für Validierung
-- **Rundungs-Präzision** konfigurierbar (0-2 Nachkommastellen)
-- **Übersichtliche UI** mit zusammenklappbaren Sektionen
-- **Ein Blueprint für alles** - Kein separates Blueprint für Zonen nötig
+### ⚙️ Flexible & Configurable
+- **Automatic detection** - Blueprint finds all required entities automatically
+- **Simple configuration** - Just select thermostats and sensors, the blueprint does the rest
+- **Adjustable update interval** (10-300 seconds)
+- **Customizable temperature limits** for validation
+- **Rounding precision** configurable (0-2 decimal places)
+- **Clear UI** with collapsible sections
+- **One blueprint for everything** - No separate blueprint needed for zones
 
 ---
 
-## 🔧 Voraussetzungen
+## 🔧 Requirements
 
-- **Home Assistant** Version 2024.6.0 oder höher
-- **Sonoff Thermostat(e)** mit "External Temperature Input" Funktion (z.B. TRVZB, NSPanel)
-- **Externe(r) Temperatursensor(en)** (z.B. Aqara, Zigbee)
-- Optional: **Fenster-/Türkontakte** für die Fenster-Erkennung
+- **Home Assistant** Version 2024.6.0 or higher
+- **Sonoff Thermostat(s)** with "External Temperature Input" function (e.g. TRVZB, NSPanel)
+- **External temperature sensor(s)** (e.g. Aqara, Zigbee)
+- Optional: **Window/door contacts** for window detection
 
 ---
 
 ## 📥 Installation
 
-### Über die UI (empfohlen)
+### Via UI (recommended)
 
-1. In Home Assistant navigiere zu: **Einstellungen** → **Automationen & Szenen** → **Blueprints**
-2. Klicke auf den Button **Blueprint importieren** (unten rechts)
-3. Füge folgende URL ein:
+1. In Home Assistant navigate to: **Settings** → **Automations & Scenes** → **Blueprints**
+2. Click the **Import Blueprint** button (bottom right)
+3. Paste the following URL:
    ```
    https://github.com/EyJunge1/ha-sonoff-smart-climate/blob/main/blueprint.yml
    ```
-4. Klicke auf **Vorschau** und dann **Importieren**
-5. Fertig! Das Blueprint erscheint in deiner Liste
+4. Click **Preview** and then **Import**
+5. Done! The blueprint will appear in your list
 
 ---
 
-## 🎯 Verwendung
+## 🎯 Usage
 
-### Einzelnes Thermostat einrichten
+### Setting up a single thermostat
 
-1. Erstelle eine neue Automation aus dem Blueprint
-2. Gib ihr einen aussagekräftigen Namen (z.B. "Wohnzimmer Thermostat")
-3. Wähle **ein** Thermostat
-4. Wähle **einen oder mehrere** Temperatursensoren
-5. Optional: Aktiviere Fenster-Erkennung
-6. Speichern & aktivieren ✅
+1. Create a new automation from the blueprint
+2. Give it a meaningful name (e.g. "Living Room Thermostat")
+3. Select **one** thermostat
+4. Select **one or multiple** temperature sensors
+5. Optional: Enable window detection
+6. Save & activate ✅
 
-Das Blueprint findet automatisch die "External Temperature Input" und "Temperature Sensor Select" Entitäten!
+The blueprint automatically finds the "External Temperature Input" and "Temperature Sensor Select" entities!
 
-### Mehrere Thermostate (große Räume/Zonen)
+### Multiple thermostats (large rooms/zones)
 
-1. Erstelle eine neue Automation aus dem Blueprint
-2. Gib ihr einen Namen (z.B. "Wohnzimmer Zone - 3 Heizkörper")
-3. Wähle **mehrere** Thermostate
-4. Wähle einen oder **mehrere** Temperatursensoren (Durchschnitt wird berechnet)
-5. Optional: Aktiviere Fenster-Erkennung
-6. Speichern & aktivieren ✅
+1. Create a new automation from the blueprint
+2. Give it a name (e.g. "Living Room Zone - 3 Radiators")
+3. Select **multiple** thermostats
+4. Select one or **multiple** temperature sensors (average will be calculated)
+5. Optional: Enable window detection
+6. Save & activate ✅
 
-Das Blueprint findet automatisch alle benötigten Entitäten für jedes Thermostat!
+The blueprint automatically finds all required entities for each thermostat!
 
 ---
 
-## 💡 Beispiele
+## 💡 Examples
 
-### Beispiel 1: Einzelnes Thermostat (einfachster Fall)
+### Example 1: Single thermostat (simplest case)
 
 ```yaml
-alias: Schlafzimmer Thermostat
+alias: Bedroom Thermostat
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
-    thermostats: climate.schlafzimmer_thermostat
-    temp_inputs: number.schlafzimmer_external_temp
-    temp_sensors: sensor.schlafzimmer_temperatur
+    thermostats: climate.bedroom_thermostat
+    temp_inputs: number.bedroom_external_temp
+    temp_sensors: sensor.bedroom_temperature
 ```
 
-### Beispiel 2: Einzelnes Thermostat mit Fenster-Erkennung
+### Example 2: Single thermostat with window detection
 
 ```yaml
-alias: Kinderzimmer Thermostat
+alias: Kids Room Thermostat
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
-    thermostats: climate.kinderzimmer_thermostat
-    temp_sensors: sensor.kinderzimmer_temperatur
+    thermostats: climate.kids_room_thermostat
+    temp_sensors: sensor.kids_room_temperature
     enable_window_detection: true
     window_sensors:
-      - binary_sensor.kinderzimmer_fenster
+      - binary_sensor.kids_room_window
 ```
 
-### Beispiel 3: Großes Wohnzimmer - 3 Thermostate, 2 Sensoren
+### Example 3: Large living room - 3 thermostats, 2 sensors
 
 ```yaml
-alias: Wohnzimmer Zone
+alias: Living Room Zone
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
     thermostats:
-      - climate.wohnzimmer_heizkoerper_1
-      - climate.wohnzimmer_heizkoerper_2
-      - climate.wohnzimmer_heizkoerper_3
+      - climate.living_room_radiator_1
+      - climate.living_room_radiator_2
+      - climate.living_room_radiator_3
     temp_sensors:
-      - sensor.wohnzimmer_temp_ecke_links  # 20.5°C
-      - sensor.wohnzimmer_temp_ecke_rechts # 21.0°C
-    # Durchschnitt: 20.75°C wird an alle 3 Thermostate gesendet
+      - sensor.living_room_temp_left_corner  # 20.5°C
+      - sensor.living_room_temp_right_corner # 21.0°C
+    # Average: 20.75°C will be sent to all 3 thermostats
 ```
 
-**So funktioniert's:**
-- Sensor 1: 20.5°C, Sensor 2: 21.0°C → **Durchschnitt: 20.75°C**
-- Alle 3 Thermostate bekommen 20.75°C
+**How it works:**
+- Sensor 1: 20.5°C, Sensor 2: 21.0°C → **Average: 20.75°C**
+- All 3 thermostats receive 20.75°C
 
-### Beispiel 4: Offener Wohnbereich mit Fenster-Erkennung
+### Example 4: Open living area with window detection
 
 ```yaml
-alias: Offener Wohnbereich
+alias: Open Living Area
 use_blueprint:
   path: sonoff_smart_climate/blueprint.yml
   input:
     thermostats:
-      - climate.wohnzimmer_thermostat
-      - climate.kueche_thermostat
-      - climate.essbereich_thermostat
+      - climate.living_room_thermostat
+      - climate.kitchen_thermostat
+      - climate.dining_area_thermostat
     temp_sensors:
-      - sensor.wohnzimmer_temperatur
-      - sensor.kueche_temperatur
-      - sensor.essbereich_temperatur
+      - sensor.living_room_temperature
+      - sensor.kitchen_temperature
+      - sensor.dining_area_temperature
     enable_window_detection: true
     window_sensors:
-      - binary_sensor.wohnzimmer_fenster_1
-      - binary_sensor.wohnzimmer_fenster_2
-      - binary_sensor.kueche_fenster
-      - binary_sensor.terrassentuer
+      - binary_sensor.living_room_window_1
+      - binary_sensor.living_room_window_2
+      - binary_sensor.kitchen_window
+      - binary_sensor.patio_door
     update_interval: 45
     round_precision: 1
 ```
 
-**Fenster-Logik:**
-- Terrassentür öffnet → **ALLE** 3 Thermostate aktivieren automatisch den "Open Window" Modus
-- Alle Fenster zu → **ALLE** 3 Thermostate deaktivieren den "Open Window" Modus
+**Window logic:**
+- Patio door opens → **ALL** 3 thermostats automatically activate the "Open Window" mode
+- All windows closed → **ALL** 3 thermostats deactivate the "Open Window" mode
 
 ---
 
-## 📄 Lizenz
+## 📄 License
 
-MIT License - siehe [LICENSE](LICENSE) Datei für Details.
+MIT License - see [LICENSE](LICENSE) file for details.

@@ -1,17 +1,17 @@
 blueprint:
   name: Sonoff Smart Climate Control
   description: >
-    Intelligente Steuerung von Sonoff Thermostaten mit externen Temperatursensoren.
+    Intelligent control of Sonoff thermostats with external temperature sensors.
     
     **Features:**
-    - Automatische Erkennung aller benötigten Entitäten
-    - Einfache Konfiguration: Nur Thermostate und Sensoren auswählen
-    - Einzelnes oder mehrere Thermostate steuern
-    - Ein oder mehrere Temperatursensoren (Durchschnitt bei mehreren)
-    - Optional: Fenster-Erkennung für automatische Heizungssteuerung
-    - Konfigurierbare Update-Intervalle und Temperatur-Grenzen
+    - Automatic detection of all required entities
+    - Simple configuration: Just select thermostats and sensors
+    - Control single or multiple thermostats
+    - One or multiple temperature sensors (average calculated for multiple sensors)
+    - Optional: Window detection for automatic heating control
+    - Configurable update intervals and temperature limits
     
-    Flexibel für einzelne Räume oder große Zonen mit mehreren Heizkörpern.
+    Flexible for single rooms or large zones with multiple radiators.
   domain: automation
   author: EyJunge1
   source_url: https://github.com/eyjunge1/ha-sonoff-smart-climate/blob/main/blueprint.yml
@@ -21,17 +21,17 @@ blueprint:
   input:
     # ==================== THERMOSTAT ====================
     thermostat_section:
-      name: Thermostat Konfiguration
+      name: Thermostat Configuration
       icon: mdi:thermostat
       description: >
-        Wähle ein oder mehrere Thermostate und die zugehörigen Sensoren.
-        Bei mehreren Thermostaten werden alle synchron gesteuert.
+        Select one or multiple thermostats and the associated sensors.
+        For multiple thermostats, all will be controlled synchronously.
       input:
         thermostats:
-          name: Thermostat(e)
+          name: Thermostat(s)
           description: >
-            Ein oder mehrere Sonoff Thermostate.
-            Bei mehreren werden alle mit der gleichen Temperatur versorgt.
+            One or multiple Sonoff thermostats.
+            For multiple thermostats, all will receive the same temperature.
           selector:
             entity:
               multiple: true
@@ -39,10 +39,10 @@ blueprint:
                 - domain: climate
         
         temp_sensors:
-          name: Temperatursensor(en)
+          name: Temperature Sensor(s)
           description: >
-            Ein oder mehrere externe Temperatursensoren (z.B. Aqara, Zigbee).
-            Bei mehreren wird die Durchschnittstemperatur berechnet.
+            One or multiple external temperature sensors (e.g. Aqara, Zigbee).
+            For multiple sensors, the average temperature will be calculated.
           selector:
             entity:
               multiple: true
@@ -50,16 +50,16 @@ blueprint:
                 - domain: sensor
                   device_class: temperature
     
-    # ==================== EINSTELLUNGEN ====================
+    # ==================== SETTINGS ====================
     settings_section:
-      name: Einstellungen
+      name: Settings
       icon: mdi:cog
-      description: Konfiguriere das Verhalten der Synchronisierung
+      description: Configure the behavior of synchronization
       collapsed: true
       input:
         update_interval:
           name: Update Interval
-          description: Wie oft soll die Temperatur synchronisiert werden (in Sekunden)
+          description: How often should the temperature be synchronized (in seconds)
           default: 30
           selector:
             number:
@@ -70,8 +70,8 @@ blueprint:
               mode: slider
         
         temp_min:
-          name: Minimale Temperatur
-          description: Temperaturwerte unter diesem Wert werden als ungültig ignoriert
+          name: Minimum Temperature
+          description: Temperature values below this value will be ignored as invalid
           default: 0
           selector:
             number:
@@ -81,8 +81,8 @@ blueprint:
               unit_of_measurement: °C
         
         temp_max:
-          name: Maximale Temperatur
-          description: Temperaturwerte über diesem Wert werden als ungültig ignoriert
+          name: Maximum Temperature
+          description: Temperature values above this value will be ignored as invalid
           default: 50
           selector:
             number:
@@ -92,8 +92,8 @@ blueprint:
               unit_of_measurement: °C
         
         round_precision:
-          name: Rundungs-Präzision
-          description: Auf wie viele Nachkommastellen soll gerundet werden
+          name: Rounding Precision
+          description: How many decimal places to round to
           default: 1
           selector:
             number:
@@ -101,27 +101,27 @@ blueprint:
               max: 2
               step: 1
     
-    # ==================== FENSTER-ERKENNUNG (Optional) ====================
+    # ==================== WINDOW DETECTION (Optional) ====================
     window_section:
-      name: Fenster-Erkennung (Optional)
+      name: Window Detection (Optional)
       icon: mdi:window-open
       description: >
-        Automatische Heizungssteuerung bei offenen Fenstern.
-        Bei mehreren Thermostaten werden alle benachrichtigt.
+        Automatic heating control with open windows.
+        For multiple thermostats, all will be notified.
       collapsed: true
       input:
         enable_window_detection:
-          name: Fenster-Erkennung aktivieren
-          description: Aktiviere die automatische Erkennung offener Fenster
+          name: Enable Window Detection
+          description: Enable automatic detection of open windows
           default: false
           selector:
             boolean:
         
         window_sensors:
-          name: Fensterkontakte
+          name: Window Contacts
           description: >
-            Wähle alle Fenster- und Türkontakte für diesen Raum.
-            Sobald einer davon geöffnet wird, schaltet das Thermostat in den "Open Window" Modus.
+            Select all window and door contacts for this room.
+            As soon as one of them is opened, the thermostat switches to "Open Window" mode.
           default: []
           selector:
             entity:
@@ -142,7 +142,7 @@ variables:
   enable_window: !input enable_window_detection
   window_sensors: !input window_sensors
   
-  # Konvertiere Thermostats zu Liste
+  # Convert thermostats to list
   thermostat_list: >
     {% if thermostats is string %}
       {{ [thermostats] }}
@@ -150,7 +150,7 @@ variables:
       {{ thermostats }}
     {% endif %}
   
-  # Finde automatisch die zugehörigen External Temperature Input Entitäten
+  # Automatically find the associated External Temperature Input entities
   temp_input_list: >
     {% set ns = namespace(inputs=[]) %}
     {% if thermostats is string %}
@@ -171,7 +171,7 @@ variables:
     {% endfor %}
     {{ ns.inputs }}
   
-  # Finde automatisch die zugehörigen Temperature Sensor Select Entitäten
+  # Automatically find the associated Temperature Sensor Select entities
   temp_sensor_select_list: >
     {% set ns = namespace(selects=[]) %}
     {% if thermostats is string %}
@@ -192,7 +192,7 @@ variables:
     {% endfor %}
     {{ ns.selects }}
   
-  # Finde automatisch die zugehörigen Open Window Switch Entitäten
+  # Automatically find the associated Open Window Switch entities
   window_switch_list: >
     {% set ns = namespace(switches=[]) %}
     {% if thermostats is string %}
@@ -224,9 +224,9 @@ triggers:
 condition: []
 
 actions:
-  # ==================== DURCHSCHNITTSTEMPERATUR BERECHNEN ====================
+  # ==================== CALCULATE AVERAGE TEMPERATURE ====================
   - variables:
-      # Sammle alle gültigen Temperaturwerte
+      # Collect all valid temperature values
       valid_temps: >
         {% set ns = namespace(temps=[]) %}
         {% if temp_sensors is string %}
@@ -242,7 +242,7 @@ actions:
         {% endfor %}
         {{ ns.temps }}
       
-      # Berechne Durchschnitt
+      # Calculate average
       avg_temp: >
         {% if valid_temps | length > 0 %}
           {{ (valid_temps | sum / valid_temps | length) | round(round_precision) }}
@@ -250,11 +250,11 @@ actions:
           {{ 0 }}
         {% endif %}
   
-  # Prüfe ob wir gültige Temperaturen haben
+  # Check if we have valid temperatures
   - condition: template
     value_template: "{{ valid_temps | length > 0 and avg_temp | float > 0 }}"
   
-  # ==================== TEMPERATURSENSOR AUF "EXTERNAL" SETZEN ====================
+  # ==================== SET TEMPERATURE SENSOR TO "EXTERNAL" ====================
   - repeat:
       count: "{{ temp_sensor_select_list | length }}"
       sequence:
@@ -268,7 +268,7 @@ actions:
           data:
             option: "external"
   
-  # ==================== TEMPERATUR AN ALLE THERMOSTATE SENDEN ====================
+  # ==================== SEND TEMPERATURE TO ALL THERMOSTATS ====================
   - repeat:
       count: "{{ temp_input_list | length }}"
       sequence:
@@ -282,16 +282,16 @@ actions:
           data:
             value: "{{ avg_temp }}"
   
-  # ==================== FENSTER-ERKENNUNG ====================
+  # ==================== WINDOW DETECTION ====================
   - condition: template
     value_template: "{{ enable_window and window_switch_list and window_switch_list | length > 0 and window_sensors and window_sensors | length > 0 }}"
   
   - variables:
-      # Prüfe ob IRGENDEIN Fenster offen ist
+      # Check if ANY window is open
       any_window_open: >
         {{ expand(window_sensors) | selectattr('state', 'in', ['on', 'open']) | list | count > 0 }}
   
-  # Setze ALLE Window Switches
+  # Set ALL window switches
   - repeat:
       count: "{{ window_switch_list | length }}"
       sequence:
