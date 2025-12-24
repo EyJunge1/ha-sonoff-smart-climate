@@ -32,9 +32,9 @@ blueprint:
             Bei mehreren werden alle mit der gleichen Temperatur versorgt.
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: climate
-              multiple: true
         
         temp_inputs:
           name: External Temperature Input(s)
@@ -43,9 +43,9 @@ blueprint:
             WICHTIG: Reihenfolge muss mit den Thermostaten übereinstimmen!
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: number
-              multiple: true
         
         temp_sensors:
           name: Temperatursensor(en)
@@ -54,10 +54,10 @@ blueprint:
             Bei mehreren wird die Durchschnittstemperatur berechnet.
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: sensor
                   device_class: temperature
-              multiple: true
     
     # ==================== EINSTELLUNGEN ====================
     settings_section:
@@ -134,9 +134,9 @@ blueprint:
           default: []
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: switch
-              multiple: true
         
         window_sensors:
           name: Fensterkontakte
@@ -146,13 +146,13 @@ blueprint:
           default: []
           selector:
             entity:
+              multiple: true
               filter:
                 - domain: binary_sensor
                   device_class:
                     - window
                     - door
                     - opening
-              multiple: true
 
 variables:
   thermostats: !input thermostats
