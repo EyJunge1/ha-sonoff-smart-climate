@@ -1,0 +1,1 @@
+# ha-sonoff-smart-climate
