@@ -4,6 +4,8 @@ blueprint:
     Intelligente Steuerung von Sonoff Thermostaten mit externen Temperatursensoren.
     
     **Features:**
+    - Automatische Erkennung aller benötigten Entitäten
+    - Einfache Konfiguration: Nur Thermostate und Sensoren auswählen
     - Einzelnes oder mehrere Thermostate steuern
     - Ein oder mehrere Temperatursensoren (Durchschnitt bei mehreren)
     - Optional: Fenster-Erkennung für automatische Heizungssteuerung
@@ -35,17 +37,6 @@ blueprint:
               multiple: true
               filter:
                 - domain: climate
-        
-        temp_inputs:
-          name: External Temperature Input(s)
-          description: >
-            Die "External Temperature Input" Entität(en) der Thermostate.
-            WICHTIG: Reihenfolge muss mit den Thermostaten übereinstimmen!
-          selector:
-            entity:
-              multiple: true
-              filter:
-                - domain: number
         
         temp_sensors:
           name: Temperatursensor(en)
@@ -156,7 +147,6 @@ blueprint:
 
 variables:
   thermostats: !input thermostats
-  temp_inputs: !input temp_inputs
   temp_sensors: !input temp_sensors
   temp_min: !input temp_min
   temp_max: !input temp_max
@@ -164,6 +154,56 @@ variables:
   enable_window: !input enable_window_detection
   window_switches: !input window_switches
   window_sensors: !input window_sensors
+  
+  # Konvertiere Thermostats zu Liste
+  thermostat_list: >
+    {% if thermostats is string %}
+      {{ [thermostats] }}
+    {% else %}
+      {{ thermostats }}
+    {% endif %}
+  
+  # Finde automatisch die zugehörigen External Temperature Input Entitäten
+  temp_input_list: >
+    {% set ns = namespace(inputs=[]) %}
+    {% if thermostats is string %}
+      {% set tlist = [thermostats] %}
+    {% else %}
+      {% set tlist = thermostats %}
+    {% endif %}
+    {% for thermostat in tlist %}
+      {% set device_id = device_id(thermostat) %}
+      {% if device_id %}
+        {% set entities = device_entities(device_id) %}
+        {% for entity in entities %}
+          {% if 'external_temperature_input' in entity and not ('_2' in entity or '_3' in entity) %}
+            {% set ns.inputs = ns.inputs + [entity] %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.inputs }}
+  
+  # Finde automatisch die zugehörigen Temperature Sensor Select Entitäten
+  temp_sensor_select_list: >
+    {% set ns = namespace(selects=[]) %}
+    {% if thermostats is string %}
+      {% set tlist = [thermostats] %}
+    {% else %}
+      {% set tlist = thermostats %}
+    {% endif %}
+    {% for thermostat in tlist %}
+      {% set device_id = device_id(thermostat) %}
+      {% if device_id %}
+        {% set entities = device_entities(device_id) %}
+        {% for entity in entities %}
+          {% if 'temperature_sensor' in entity and states[entity].domain == 'select' %}
+            {% set ns.selects = ns.selects + [entity] %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.selects }}
 
 triggers:
   - trigger: time_pattern
@@ -201,25 +241,24 @@ actions:
         {% else %}
           {{ 0 }}
         {% endif %}
-      
-      # Konvertiere zu Liste falls nötig
-      thermostat_list: >
-        {% if thermostats is string %}
-          {{ [thermostats] }}
-        {% else %}
-          {{ thermostats }}
-        {% endif %}
-      
-      temp_input_list: >
-        {% if temp_inputs is string %}
-          {{ [temp_inputs] }}
-        {% else %}
-          {{ temp_inputs }}
-        {% endif %}
   
   # Prüfe ob wir gültige Temperaturen haben
   - condition: template
     value_template: "{{ valid_temps | length > 0 and avg_temp | float > 0 }}"
+  
+  # ==================== TEMPERATURSENSOR AUF "EXTERNAL" SETZEN ====================
+  - repeat:
+      count: "{{ temp_sensor_select_list | length }}"
+      sequence:
+        - variables:
+            current_index: "{{ repeat.index - 1 }}"
+            current_sensor_select: "{{ temp_sensor_select_list[current_index] }}"
+        
+        - action: select.select_option
+          target:
+            entity_id: "{{ current_sensor_select }}"
+          data:
+            option: "external"
   
   # ==================== TEMPERATUR AN ALLE THERMOSTATE SENDEN ====================
   - repeat:

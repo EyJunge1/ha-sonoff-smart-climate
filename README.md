@@ -7,6 +7,7 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 - 🏘️ Große Räume mit mehreren Thermostaten
 - 📊 Einen oder mehrere Temperatursensoren (Durchschnitt bei mehreren)
 - 🪟 Optionale Fenster-Erkennung
+- ✨ **NEU:** Automatische Erkennung aller Thermostat-Entitäten!
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6.0+-blue.svg)](https://www.home-assistant.io/)
 [![Blueprint](https://img.shields.io/badge/Blueprint-automation-orange.svg)](https://www.home-assistant.io/docs/automation/using_blueprints/)
@@ -41,6 +42,8 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 - Bei mehreren Thermostaten: **EINES offen = ALLE informiert**
 
 ### ⚙️ Flexibel & Konfigurierbar
+- **Automatische Erkennung** - Blueprint findet alle benötigten Entitäten selbst
+- **Einfache Konfiguration** - Nur Thermostate und Sensoren auswählen, den Rest macht das Blueprint
 - **Einstellbares Update-Interval** (10-300 Sekunden)
 - **Anpassbare Temperatur-Grenzen** für Validierung
 - **Rundungs-Präzision** konfigurierbar (0-2 Nachkommastellen)
@@ -79,18 +82,23 @@ Ein flexibles Home Assistant Blueprint zur intelligenten Steuerung von Sonoff Th
 
 1. Erstelle eine neue Automation aus dem Blueprint
 2. Gib ihr einen aussagekräftigen Namen (z.B. "Wohnzimmer Thermostat")
-3. Wähle **ein** Thermostat, **einen** Temp Input, **einen** Sensor
-4. Optional: Aktiviere Fenster-Erkennung
-5. Speichern & aktivieren ✅
+3. Wähle **ein** Thermostat
+4. Wähle **einen oder mehrere** Temperatursensoren
+5. Optional: Aktiviere Fenster-Erkennung
+6. Speichern & aktivieren ✅
+
+Das Blueprint findet automatisch die "External Temperature Input" und "Temperature Sensor Select" Entitäten!
 
 ### Mehrere Thermostate (große Räume/Zonen)
 
 1. Erstelle eine neue Automation aus dem Blueprint
 2. Gib ihr einen Namen (z.B. "Wohnzimmer Zone - 3 Heizkörper")
-3. Wähle **mehrere** Thermostate und entsprechende Temp Inputs
+3. Wähle **mehrere** Thermostate
 4. Wähle einen oder **mehrere** Temperatursensoren (Durchschnitt wird berechnet)
-5. Optional: Aktiviere Fenster-Erkennung mit mehreren Window Switches
-6. ⚠️ **WICHTIG:** Reihenfolge bei Thermostaten/Inputs/Switches muss übereinstimmen!
+5. Optional: Aktiviere Fenster-Erkennung
+6. Speichern & aktivieren ✅
+
+Das Blueprint findet automatisch alle benötigten Entitäten für jedes Thermostat!
 
 ---
 
