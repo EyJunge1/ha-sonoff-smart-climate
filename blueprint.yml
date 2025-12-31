@@ -238,7 +238,41 @@ triggers:
 condition: []
 
 actions:
-  # ==================== STEP 1: CALCULATE AVERAGE TEMPERATURE ====================
+  # ==================== STEP 1: WINDOW DETECTION (PRIORITY - RUNS FIRST) ====================
+  # Check if this is a window trigger and window detection is enabled
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ enable_window and 
+                 window_switch_list | length > 0 and 
+                 window_sensors | length > 0 and
+                 trigger.platform == 'state' and
+                 trigger.entity_id is defined and
+                 trigger.entity_id in window_sensors }}
+        sequence:
+          - variables:
+              # Check if ANY window/door is open
+              any_window_open: >
+                {{ expand(window_sensors) 
+                   | selectattr('state', 'in', ['on', 'open']) 
+                   | list | count > 0 }}
+          
+          # Toggle "Open Window" mode on ALL thermostats
+          - repeat:
+              count: "{{ window_switch_list | length }}"
+              sequence:
+                - variables:
+                    current_switch: "{{ window_switch_list[repeat.index - 1] }}"
+                
+                - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
+                  target:
+                    entity_id: "{{ current_switch }}"
+          
+          # Stop here - window trigger handled
+          - stop: "Window state changed - heating control updated"
+  
+  # ==================== STEP 2: CALCULATE AVERAGE TEMPERATURE ====================
   - variables:
       # Collect valid temperature values (exclude unavailable/unknown sensors)
       valid_temps: >
@@ -272,7 +306,7 @@ actions:
          temp_input_list | length > 0 and
          temp_sensor_select_list | length > 0 }}
   
-  # ==================== STEP 2: CONFIGURE THERMOSTATS TO USE EXTERNAL SENSOR ====================
+  # ==================== STEP 3: CONFIGURE THERMOSTATS TO USE EXTERNAL SENSOR ====================
   - repeat:
       count: "{{ temp_sensor_select_list | length }}"
       sequence:
@@ -285,7 +319,7 @@ actions:
           data:
             option: "external"
   
-  # ==================== STEP 3: SEND AVERAGE TEMPERATURE TO ALL THERMOSTATS ====================
+  # ==================== STEP 4: SEND AVERAGE TEMPERATURE TO ALL THERMOSTATS ====================
   - repeat:
       count: "{{ temp_input_list | length }}"
       sequence:
@@ -298,7 +332,7 @@ actions:
           data:
             value: "{{ avg_temp }}"
   
-  # ==================== STEP 4: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
+  # ==================== STEP 5: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
   # Only run if: sync enabled, multiple thermostats, and trigger was a thermostat change
   - condition: template
     value_template: >
@@ -336,31 +370,5 @@ actions:
             entity_id: "{{ current_thermostat }}"
           data:
             temperature: "{{ new_target_temp }}"
-  
-  # ==================== STEP 5: WINDOW DETECTION (OPTIONAL) ====================
-  # Only run if: window detection enabled and sensors configured
-  - condition: template
-    value_template: >
-      {{ enable_window and 
-         window_switch_list | length > 0 and 
-         window_sensors | length > 0 }}
-  
-  - variables:
-      # Check if ANY window/door is open
-      any_window_open: >
-        {{ expand(window_sensors) 
-           | selectattr('state', 'in', ['on', 'open']) 
-           | list | count > 0 }}
-  
-  # Toggle "Open Window" mode on ALL thermostats
-  - repeat:
-      count: "{{ window_switch_list | length }}"
-      sequence:
-        - variables:
-            current_switch: "{{ window_switch_list[repeat.index - 1] }}"
-        
-        - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
-          target:
-            entity_id: "{{ current_switch }}"
 
 mode: restart
