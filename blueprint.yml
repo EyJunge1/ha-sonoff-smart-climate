@@ -168,8 +168,7 @@ variables:
   # Auto-detect: External Temperature Input entities (number.xxx_external_temperature_input)
   temp_input_list: >
     {% set ns = namespace(inputs=[]) %}
-    {% set tlist = [thermostats] if thermostats is string else thermostats %}
-    {% for thermostat in tlist %}
+    {% for thermostat in thermostat_list %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
         {% for entity in device_entities(device_id) %}
@@ -184,8 +183,7 @@ variables:
   # Auto-detect: Temperature Sensor Select entities (select.xxx_temperature_sensor)
   temp_sensor_select_list: >
     {% set ns = namespace(selects=[]) %}
-    {% set tlist = [thermostats] if thermostats is string else thermostats %}
-    {% for thermostat in tlist %}
+    {% for thermostat in thermostat_list %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
         {% for entity in device_entities(device_id) %}
@@ -200,8 +198,7 @@ variables:
   # Auto-detect: Open Window Switch entities (switch.xxx_open_window)
   window_switch_list: >
     {% set ns = namespace(switches=[]) %}
-    {% set tlist = [thermostats] if thermostats is string else thermostats %}
-    {% for thermostat in tlist %}
+    {% for thermostat in thermostat_list %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
         {% for entity in device_entities(device_id) %}
@@ -239,7 +236,7 @@ condition: []
 
 actions:
   # ==================== STEP 1: WINDOW DETECTION (PRIORITY - RUNS FIRST) ====================
-  # Check if this is a window trigger and window detection is enabled
+  # Reacts instantly when ANY window/door opens or closes
   - choose:
       - conditions:
           - condition: template
@@ -252,24 +249,23 @@ actions:
                  trigger.entity_id in window_sensors }}
         sequence:
           - variables:
-              # Check if ANY window/door is open
+              # Check if ANY window/door is currently open
               any_window_open: >
                 {{ expand(window_sensors) 
                    | selectattr('state', 'in', ['on', 'open']) 
                    | list | count > 0 }}
           
-          # Toggle "Open Window" mode on ALL thermostats
+          # Set "Open Window" mode on ALL thermostats
+          # - If ANY window is open → Turn ON (heating stops)
+          # - If ALL windows are closed → Turn OFF (heating resumes)
           - repeat:
-              count: "{{ window_switch_list | length }}"
+              for_each: "{{ window_switch_list }}"
               sequence:
-                - variables:
-                    current_switch: "{{ window_switch_list[repeat.index - 1] }}"
-                
                 - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
                   target:
-                    entity_id: "{{ current_switch }}"
+                    entity_id: "{{ repeat.item }}"
           
-          # Stop here - window trigger handled
+          # Stop here - window trigger handled, no need to continue
           - stop: "Window state changed - heating control updated"
   
   # ==================== STEP 2: CALCULATE AVERAGE TEMPERATURE ====================
@@ -308,27 +304,21 @@ actions:
   
   # ==================== STEP 3: CONFIGURE THERMOSTATS TO USE EXTERNAL SENSOR ====================
   - repeat:
-      count: "{{ temp_sensor_select_list | length }}"
+      for_each: "{{ temp_sensor_select_list }}"
       sequence:
-        - variables:
-            current_sensor_select: "{{ temp_sensor_select_list[repeat.index - 1] }}"
-        
         - action: select.select_option
           target:
-            entity_id: "{{ current_sensor_select }}"
+            entity_id: "{{ repeat.item }}"
           data:
             option: "external"
   
   # ==================== STEP 4: SEND AVERAGE TEMPERATURE TO ALL THERMOSTATS ====================
   - repeat:
-      count: "{{ temp_input_list | length }}"
+      for_each: "{{ temp_input_list }}"
       sequence:
-        - variables:
-            current_temp_input: "{{ temp_input_list[repeat.index - 1] }}"
-        
         - action: number.set_value
           target:
-            entity_id: "{{ current_temp_input }}"
+            entity_id: "{{ repeat.item }}"
           data:
             value: "{{ avg_temp }}"
   
@@ -353,21 +343,20 @@ actions:
   
   # Apply new temperature to all OTHER thermostats (if different)
   - repeat:
-      count: "{{ thermostat_list | length }}"
+      for_each: "{{ thermostat_list }}"
       sequence:
         - variables:
-            current_thermostat: "{{ thermostat_list[repeat.index - 1] }}"
-            current_temp: "{{ state_attr(current_thermostat, 'temperature') | float(0) }}"
+            current_temp: "{{ state_attr(repeat.item, 'temperature') | float(0) }}"
         
         # Skip if: same thermostat OR temperature already matches
         - condition: template
           value_template: >
-            {{ current_thermostat != triggered_thermostat and
+            {{ repeat.item != triggered_thermostat and
                current_temp != new_target_temp }}
         
         - action: climate.set_temperature
           target:
-            entity_id: "{{ current_thermostat }}"
+            entity_id: "{{ repeat.item }}"
           data:
             temperature: "{{ new_target_temp }}"
 
