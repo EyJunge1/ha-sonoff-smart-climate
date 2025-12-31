@@ -55,7 +55,7 @@ A flexible and robust Home Assistant Blueprint for intelligent control of Sonoff
 ### ⚙️ Flexible & Configurable
 - **Automatic detection** - Blueprint finds all required entities automatically
 - **Simple configuration** - Just select thermostats and sensors, the blueprint does the rest
-- **Adjustable update interval** (10-300 seconds)
+- **Regular updates** - Automatic temperature sync every 30 seconds (plus instant reactions)
 - **Customizable temperature limits** for validation
 - **Rounding precision** configurable (0-2 decimal places)
 - **Clear UI** with collapsible sections
@@ -200,7 +200,6 @@ use_blueprint:
       - binary_sensor.living_room_window_2
       - binary_sensor.kitchen_window
       - binary_sensor.patio_door
-    update_interval: 45
     round_precision: 1
 ```
 

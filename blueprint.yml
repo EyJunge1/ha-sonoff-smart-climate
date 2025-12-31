@@ -62,18 +62,6 @@ blueprint:
       description: Configure the behavior of synchronization
       collapsed: true
       input:
-        update_interval:
-          name: Update Interval
-          description: How often should the temperature be synchronized (in seconds)
-          default: 30
-          selector:
-            number:
-              min: 10
-              max: 300
-              step: 5
-              unit_of_measurement: s
-              mode: slider
-        
         temp_min:
           name: Minimum Temperature
           description: Temperature values below this value will be ignored as invalid
@@ -161,54 +149,36 @@ variables:
   enable_window: !input enable_window_detection
   window_sensors: !input window_sensors
   
-  # Convert thermostats to list (handle single or multiple)
+  # Convert to lists (handle single or multiple)
   thermostat_list: >
     {{ [thermostats] if thermostats is string else thermostats }}
   
-  # Auto-detect: External Temperature Input entities (number.xxx_external_temperature_input)
-  temp_input_list: >
-    {% set ns = namespace(inputs=[]) %}
+  sensor_list: >
+    {{ [temp_sensors] if temp_sensors is string else temp_sensors }}
+  
+  # Auto-detect: All required entities in ONE loop (performance optimization)
+  detected_entities: >
+    {% set ns = namespace(inputs=[], selects=[], switches=[]) %}
     {% for thermostat in thermostat_list %}
       {% set device_id = device_id(thermostat) %}
       {% if device_id %}
         {% for entity in device_entities(device_id) %}
           {% if 'external_temperature_input' in entity and not ('_2' in entity or '_3' in entity) %}
             {% set ns.inputs = ns.inputs + [entity] %}
-          {% endif %}
-        {% endfor %}
-      {% endif %}
-    {% endfor %}
-    {{ ns.inputs }}
-  
-  # Auto-detect: Temperature Sensor Select entities (select.xxx_temperature_sensor)
-  temp_sensor_select_list: >
-    {% set ns = namespace(selects=[]) %}
-    {% for thermostat in thermostat_list %}
-      {% set device_id = device_id(thermostat) %}
-      {% if device_id %}
-        {% for entity in device_entities(device_id) %}
-          {% if 'temperature_sensor' in entity and states[entity].domain == 'select' %}
+          {% elif 'temperature_sensor' in entity and states[entity].domain == 'select' %}
             {% set ns.selects = ns.selects + [entity] %}
-          {% endif %}
-        {% endfor %}
-      {% endif %}
-    {% endfor %}
-    {{ ns.selects }}
-  
-  # Auto-detect: Open Window Switch entities (switch.xxx_open_window)
-  window_switch_list: >
-    {% set ns = namespace(switches=[]) %}
-    {% for thermostat in thermostat_list %}
-      {% set device_id = device_id(thermostat) %}
-      {% if device_id %}
-        {% for entity in device_entities(device_id) %}
-          {% if 'open_window' in entity and states[entity].domain == 'switch' %}
+          {% elif 'open_window' in entity and states[entity].domain == 'switch' %}
             {% set ns.switches = ns.switches + [entity] %}
           {% endif %}
         {% endfor %}
       {% endif %}
     {% endfor %}
-    {{ ns.switches }}
+    {{ {'inputs': ns.inputs, 'selects': ns.selects, 'switches': ns.switches} }}
+  
+  # Extract individual lists from combined detection
+  temp_input_list: "{{ detected_entities.inputs }}"
+  temp_sensor_select_list: "{{ detected_entities.selects }}"
+  window_switch_list: "{{ detected_entities.switches }}"
 
 triggers:
   # Regular interval: Update external temperature every 30 seconds
@@ -273,7 +243,6 @@ actions:
       # Collect valid temperature values (exclude unavailable/unknown sensors)
       valid_temps: >
         {% set ns = namespace(temps=[]) %}
-        {% set sensor_list = [temp_sensors] if temp_sensors is string else temp_sensors %}
         {% for sensor in sensor_list %}
           {% set temp_state = states(sensor) %}
           {% if temp_state not in ['unavailable', 'unknown', 'none', ''] %}
@@ -323,7 +292,7 @@ actions:
             value: "{{ avg_temp }}"
   
   # ==================== STEP 5: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
-  # Only run if: sync enabled, multiple thermostats, and trigger was a thermostat change
+  # Only run if: sync enabled, multiple thermostats, trigger was a thermostat change, and valid temp
   - condition: template
     value_template: >
       {{ sync_target_temp and 
@@ -332,14 +301,12 @@ actions:
          trigger.entity_id is defined and
          trigger.entity_id in thermostat_list and
          trigger.to_state is defined and
-         trigger.to_state.attributes.temperature is defined }}
+         trigger.to_state.attributes.temperature is defined and
+         trigger.to_state.attributes.temperature | float(0) > 0 }}
   
   - variables:
       triggered_thermostat: "{{ trigger.entity_id }}"
       new_target_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
-  
-  - condition: template
-    value_template: "{{ new_target_temp | float > 0 }}"
   
   # Apply new temperature to all OTHER thermostats (if different)
   - repeat:
