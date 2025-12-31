@@ -10,7 +10,7 @@ blueprint:
     - One or multiple temperature sensors (average calculated for multiple sensors)
     - Automatic synchronization of target temperatures for multiple thermostats
     - Optional: Window detection for automatic heating control
-    - Configurable update intervals and temperature limits
+    - Configurable temperature limits and rounding precision
     
     Flexible for single rooms or large zones with multiple radiators.
   domain: automation
