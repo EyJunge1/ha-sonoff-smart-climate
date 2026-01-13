@@ -8,6 +8,7 @@ blueprint:
     - Simple configuration: Just select thermostats and sensors
     - Control single or multiple thermostats
     - One or multiple temperature sensors (average calculated for multiple sensors)
+    - Automatic fallback to internal sensor if external sensors become unavailable
     - Automatic synchronization of target temperatures for multiple thermostats
     - Optional: Window detection for automatic heating control
     - Configurable temperature limits and rounding precision
@@ -261,35 +262,58 @@ actions:
         {% else %}
           {{ 0 }}
         {% endif %}
+      
+      # Check if we have valid external sensor data
+      has_valid_sensors: >
+        {{ valid_temps | length > 0 and 
+           avg_temp | float > 0 and
+           temp_input_list | length > 0 and
+           temp_sensor_select_list | length > 0 }}
   
-  # Validate: Check if we have valid data to proceed
-  - condition: template
-    value_template: >
-      {{ valid_temps | length > 0 and 
-         avg_temp | float > 0 and
-         thermostat_list | length > 0 and
-         temp_input_list | length > 0 and
-         temp_sensor_select_list | length > 0 }}
-  
-  # ==================== STEP 3: CONFIGURE THERMOSTATS TO USE EXTERNAL SENSOR ====================
-  - repeat:
-      for_each: "{{ temp_sensor_select_list }}"
-      sequence:
-        - action: select.select_option
-          target:
-            entity_id: "{{ repeat.item }}"
-          data:
-            option: "external"
-  
-  # ==================== STEP 4: SEND AVERAGE TEMPERATURE TO ALL THERMOSTATS ====================
-  - repeat:
-      for_each: "{{ temp_input_list }}"
-      sequence:
-        - action: number.set_value
-          target:
-            entity_id: "{{ repeat.item }}"
-          data:
-            value: "{{ avg_temp }}"
+  # ==================== STEP 3: CONFIGURE THERMOSTAT SENSOR MODE ====================
+  # Choose between external (if sensors valid) or internal (if sensors unavailable)
+  - choose:
+      # Case 1: Valid external sensors available → Use external sensor
+      - conditions:
+          - condition: template
+            value_template: "{{ has_valid_sensors }}"
+        sequence:
+          # Configure thermostats to use external sensor
+          - repeat:
+              for_each: "{{ temp_sensor_select_list }}"
+              sequence:
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    option: "external"
+          
+          # Send average temperature to all thermostats
+          - repeat:
+              for_each: "{{ temp_input_list }}"
+              sequence:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    value: "{{ avg_temp }}"
+      
+      # Case 2: No valid external sensors → Fallback to internal sensor
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ not has_valid_sensors and
+                 temp_sensor_select_list | length > 0 }}
+        sequence:
+          # Configure thermostats to use internal sensor (fallback)
+          - repeat:
+              for_each: "{{ temp_sensor_select_list }}"
+              sequence:
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    option: "internal"
   
   # ==================== STEP 5: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
   # Only run if: sync enabled, multiple thermostats, trigger was a thermostat change, and valid temp

@@ -12,6 +12,7 @@ A flexible and robust Home Assistant Blueprint for intelligent control of Sonoff
 - 🔄 **NEW:** Automatic temperature synchronization - Turn any thermostat, all others follow!
 - ⚡ **NEW:** Smart updates - Only when values actually change (saves battery & network)
 - 🛡️ **NEW:** Robust error handling - Ignores unavailable sensors safely
+- 🔄 **NEW:** Automatic fallback to internal sensor when external sensors become unavailable
 - ✨ Automatic detection of all thermostat entities!
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6.0+-blue.svg)](https://www.home-assistant.io/)
@@ -40,6 +41,7 @@ A flexible and robust Home Assistant Blueprint for intelligent control of Sonoff
 - **Automatic temperature synchronization** - When you adjust any thermostat, all others follow automatically
 - **One or multiple sensors** - Average automatically calculated for multiple sensors
 - **Smart sensor validation** - Unavailable or faulty sensors are automatically ignored
+- **Automatic fallback** - If all external sensors become unavailable, automatically switches to internal sensor
 - **Precise measurement** through external sensors (Aqara, Zigbee, etc.)
 - **Real-time updates** on temperature changes
 - **Validation** of temperature values (Min/Max limits)
@@ -177,6 +179,7 @@ use_blueprint:
 - **Turn the dial on any thermostat to 22°C** → All 3 instantly set to 22°C ⚡
 - **Turn the dial on another thermostat to 19°C** → All 3 instantly set to 19°C ⚡
 - **If sensor 1 becomes unavailable** → Uses only sensor 2 (21.0°C) 🛡️
+- **If all sensors become unavailable** → Automatically switches to internal sensor 🔄
 - No conflicts, no wasted energy, perfect synchronization!
 
 ### Example 4: Open living area with window detection
@@ -214,7 +217,7 @@ use_blueprint:
 
 ### What happens if a temperature sensor becomes unavailable?
 
-The blueprint automatically ignores unavailable sensors and uses only the working ones. If all sensors are unavailable, the automation stops safely without sending invalid data.
+The blueprint automatically ignores unavailable sensors and uses only the working ones. If all external sensors become unavailable (unknown, unavailable, or invalid values), the system automatically switches to the internal sensor of the thermostat as a fallback. When external sensors become available again (checked every 30 seconds), the system automatically switches back to using the external sensors.
 
 ### Why use multiple thermostats in one room?
 
@@ -261,13 +264,16 @@ The blueprint operates in **5 steps** every time it's triggered:
    - Calculates the average from valid sensors
    - Validates against min/max temperature limits
 
-2. **Configure Thermostats**
-   - Sets all thermostats to use "external" temperature sensor mode
+2. **Configure Thermostat Sensor Mode**
+   - If valid external sensors are available: Sets all thermostats to use "external" temperature sensor mode
+   - If all external sensors are unavailable: Automatically switches to "internal" sensor mode (fallback)
    - Auto-detects the correct sensor select entity for each thermostat
+   - Checks every 30 seconds and automatically switches back to external when sensors become available again
 
-3. **Send Temperature**
+3. **Send Temperature** (only if external sensors are valid)
    - Sends the calculated average temperature to all thermostats
    - All thermostats work with the same perceived room temperature
+   - If using internal sensor fallback, no temperature is sent (thermostat uses its own internal sensor)
 
 4. **Synchronize Target Temperatures** (if enabled)
    - When you turn the dial on any thermostat, all others follow
@@ -298,10 +304,12 @@ The automation reacts to these events:
 - Ensures the last adjustment always wins
 - No lost updates or conflicts
 
-**Smart Sensor Validation:**
+**Smart Sensor Validation & Fallback:**
 - Sensors with state `unavailable`, `unknown`, or `none` are automatically skipped
-- If all sensors are unavailable, the automation stops safely
+- If all external sensors are unavailable, the system automatically switches to the internal sensor
+- When external sensors become available again (checked every 30 seconds), automatically switches back to external mode
 - Prevents sending invalid temperatures to thermostats
+- Ensures continuous operation even when external sensors fail
 
 **Optimized Updates:**
 - Temperature is only sent to a thermostat if it differs from current value
