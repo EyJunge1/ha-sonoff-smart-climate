@@ -158,6 +158,7 @@ variables:
     {{ [temp_sensors] if temp_sensors is string else temp_sensors }}
   
   # Auto-detect: All required entities in ONE loop (performance optimization)
+  # Runs on every trigger execution, so entities are automatically detected when thermostats come back online
   detected_entities: >
     {% set ns = namespace(inputs=[], selects=[], switches=[]) %}
     {% for thermostat in thermostat_list %}
@@ -199,6 +200,10 @@ triggers:
     entity_id: !input thermostats
     attribute: temperature
   
+  # Instant reaction: Thermostat state changed (e.g. comes back online)
+  - trigger: state
+    entity_id: !input thermostats
+  
   # Instant reaction: Window/door opened or closed
   - trigger: state
     entity_id: !input window_sensors
@@ -229,9 +234,13 @@ actions:
           # Set "Open Window" mode on ALL thermostats
           # - If ANY window is open → Turn ON (heating stops)
           # - If ALL windows are closed → Turn OFF (heating resumes)
+          # Skip unavailable/unknown switch entities
           - repeat:
               for_each: "{{ window_switch_list }}"
               sequence:
+                - condition: template
+                  value_template: >
+                    {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] }}
                 - action: "switch.turn_{{ 'on' if any_window_open else 'off' }}"
                   target:
                     entity_id: "{{ repeat.item }}"
@@ -279,9 +288,13 @@ actions:
             value_template: "{{ has_valid_sensors }}"
         sequence:
           # Configure thermostats to use external sensor
+          # Skip unavailable/unknown entities
           - repeat:
               for_each: "{{ temp_sensor_select_list }}"
               sequence:
+                - condition: template
+                  value_template: >
+                    {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] }}
                 - action: select.select_option
                   target:
                     entity_id: "{{ repeat.item }}"
@@ -289,9 +302,13 @@ actions:
                     option: "external"
           
           # Send average temperature to all thermostats
+          # Skip unavailable/unknown entities
           - repeat:
               for_each: "{{ temp_input_list }}"
               sequence:
+                - condition: template
+                  value_template: >
+                    {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] }}
                 - action: number.set_value
                   target:
                     entity_id: "{{ repeat.item }}"
@@ -306,9 +323,13 @@ actions:
                  temp_sensor_select_list | length > 0 }}
         sequence:
           # Configure thermostats to use internal sensor (fallback)
+          # Skip unavailable/unknown entities
           - repeat:
               for_each: "{{ temp_sensor_select_list }}"
               sequence:
+                - condition: template
+                  value_template: >
+                    {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] }}
                 - action: select.select_option
                   target:
                     entity_id: "{{ repeat.item }}"
@@ -333,9 +354,14 @@ actions:
       new_target_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
   
   # Apply new temperature to all OTHER thermostats (if different)
+  # Skip unavailable/unknown thermostats
   - repeat:
       for_each: "{{ thermostat_list }}"
       sequence:
+        - condition: template
+          value_template: >
+            {{ states(repeat.item) not in ['unavailable', 'unknown', 'none', ''] }}
+        
         - variables:
             current_temp: "{{ state_attr(repeat.item, 'temperature') | float(0) }}"
         

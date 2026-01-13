@@ -29,8 +29,12 @@ A flexible and robust Home Assistant Blueprint for intelligent control of Sonoff
 - [Usage](#-usage)
 - [Examples](#-examples)
 - [FAQ & Troubleshooting](#-faq--troubleshooting)
+- [Edge Cases & Error Handling](#️-edge-cases--error-handling)
 - [Technical Details](#-technical-details)
 - [License](#-license)
+
+**📖 Weitere Dokumentation:**
+- [Edge Cases & Error Handling (Detailliert)](EDGE_CASES.md) - Vollständige Übersicht aller Fehlerszenarien
 
 ---
 
@@ -249,6 +253,21 @@ No! The blueprint is optimized to:
 - Only send updates when values actually change
 - Avoid unnecessary Zigbee traffic
 - Work efficiently with battery-powered devices
+
+---
+
+## 🛡️ Edge Cases & Error Handling
+
+Dieses Blueprint ist darauf ausgelegt, verschiedene Fehlerszenarien elegant zu behandeln. Es beinhaltet umfassende Fehlerbehandlung für:
+
+- 🌡️ **Temperatursensor-Fehler** - Unavailable Sensoren, ungültige Werte, automatischer Fallback
+- 🔧 **Thermostat-Fehler** - Offline Thermostate, automatische Wiederherstellung, Synchronisierung
+- 🪟 **Fensterkontakt-Fehler** - Unavailable Sensoren, automatische Erkennung
+- 📡 **Netzwerkprobleme** - Graceful Degradation, Auto-Recovery
+
+**📖 Detaillierte Dokumentation:** Siehe [EDGE_CASES.md](EDGE_CASES.md) für eine vollständige Übersicht aller Edge Cases und wie das Blueprint sie behandelt.
+
+**Grundprinzip:** Das Blueprint schlägt nie vollständig fehl. Es arbeitet immer mit dem, was verfügbar ist, und stellt automatisch wieder her, wenn Geräte wieder online gehen.
 
 ---
 
