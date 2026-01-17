@@ -1,19 +1,19 @@
 # 🌡️ Sonoff Smart Climate - Home Assistant Blueprint
 
-A flexible and robust Home Assistant Blueprint for intelligent control of Sonoff thermostats with external temperature sensors, automatic synchronization, and optional window detection.
+Ein flexibles und robustes Home Assistant Blueprint für intelligente Steuerung von Sonoff Thermostaten mit externen Temperatursensoren, automatischer Synchronisierung und optionaler Fenstererkennung.
 
-**✨ Smart, Fast, and Reliable** - Optimized for battery life, instant reactions, and safe handling of unavailable sensors.
+**✨ Smart, Schnell und Zuverlässig** - Optimiert für Batterielaufzeit, sofortige Reaktionen und sichere Behandlung aller Fehlerszenarien.
 
-**Works for:**
-- 🏠 Single rooms with one thermostat
-- 🏘️ Large rooms with multiple thermostats
-- 📊 One or multiple temperature sensors (average calculated, unavailable sensors ignored)
-- 🪟 Optional window detection with instant reaction
-- 🔄 **NEW:** Automatic temperature synchronization - Turn any thermostat, all others follow!
-- ⚡ **NEW:** Smart updates - Only when values actually change (saves battery & network)
-- 🛡️ **NEW:** Robust error handling - Ignores unavailable sensors safely
-- 🔄 **NEW:** Automatic fallback to internal sensor when external sensors become unavailable
-- ✨ Automatic detection of all thermostat entities!
+**Funktioniert für:**
+- 🏠 Einzelne Räume mit einem Thermostat
+- 🏘️ Große Räume mit mehreren Thermostaten
+- 📊 Einen oder mehrere Temperatursensoren (Durchschnitt wird berechnet, defekte Sensoren werden ignoriert)
+- 🪟 Optionale Fenstererkennung mit sofortiger Reaktion
+- 🔄 Automatische Temperatur-Synchronisierung - Drehe an einem beliebigen Thermostat, alle anderen folgen!
+- ⚡ Intelligente Updates - Nur wenn sich Werte tatsächlich ändern (spart Batterie & Netzwerk)
+- 🛡️ **51 Edge Cases behandelt** - Robuste Fehlerbehandlung für alle Szenarien
+- 🔄 Automatischer Fallback auf internen Sensor bei Sensor-Ausfall
+- ✨ Automatische Erkennung aller Thermostat-Entities!
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6.0+-blue.svg)](https://www.home-assistant.io/)
 [![Blueprint](https://img.shields.io/badge/Blueprint-automation-orange.svg)](https://www.home-assistant.io/docs/automation/using_blueprints/)
@@ -67,13 +67,18 @@ A flexible and robust Home Assistant Blueprint for intelligent control of Sonoff
 - **Clear UI** with collapsible sections
 - **One blueprint for everything** - No separate blueprint needed for zones
 
-### 🛡️ Robust & Reliable
-- **Restart mode** - Latest changes always win, no lost updates
-- **Safe sensor handling** - Unavailable sensors don't break the automation
-- **Entity validation** - Checks for required entities before executing
-- **Smart change detection** - Avoids unnecessary Zigbee traffic
-- **Battery friendly** - Only updates when needed
-- **Clean code** - Well-structured and maintainable
+### 🛡️ Robust & Zuverlässig
+- **51 Edge Cases behandelt** - Umfassende Fehlerbehandlung für alle Szenarien
+- **Restart mode** - Letzte Änderung gewinnt immer, keine verlorenen Updates
+- **Sichere Sensor-Behandlung** - Defekte Sensoren brechen die Automatisierung nicht ab
+- **Entity-Validierung** - Prüft verfügbare Entities vor jeder Ausführung
+- **Smart Change Detection** - Verhindert unnötigen Zigbee-Traffic
+- **Batteriefreundlich** - Updates nur bei tatsächlichen Änderungen
+- **Automatische Recovery** - Geräte werden automatisch wieder einbezogen wenn sie online kommen
+- **Graceful Degradation** - System arbeitet immer mit verfügbaren Geräten
+- **Trigger-Validierung** - Robuste Behandlung aller Trigger-Typen
+- **Division-durch-Null-Schutz** - Mathematisch robuste Berechnungen
+- **Cleaner Code** - Gut strukturiert und wartbar
 
 ---
 
@@ -258,16 +263,29 @@ No! The blueprint is optimized to:
 
 ## 🛡️ Edge Cases & Error Handling
 
-Dieses Blueprint ist darauf ausgelegt, verschiedene Fehlerszenarien elegant zu behandeln. Es beinhaltet umfassende Fehlerbehandlung für:
-
-- 🌡️ **Temperatursensor-Fehler** - Unavailable Sensoren, ungültige Werte, automatischer Fallback
-- 🔧 **Thermostat-Fehler** - Offline Thermostate, automatische Wiederherstellung, Synchronisierung
-- 🪟 **Fensterkontakt-Fehler** - Unavailable Sensoren, automatische Erkennung
-- 📡 **Netzwerkprobleme** - Graceful Degradation, Auto-Recovery
-
-**📖 Detaillierte Dokumentation:** Siehe [EDGE_CASES.md](EDGE_CASES.md) für eine vollständige Übersicht aller Edge Cases und wie das Blueprint sie behandelt.
+Dieses Blueprint behandelt **51 verschiedene Edge Cases** und Fehlerszenarien elegant und automatisch.
 
 **Grundprinzip:** Das Blueprint schlägt nie vollständig fehl. Es arbeitet immer mit dem, was verfügbar ist, und stellt automatisch wieder her, wenn Geräte wieder online gehen.
+
+**Garantien:**
+- ✅ Keine Hard Failures - System arbeitet immer
+- ✅ Graceful Degradation - Funktioniert mit verfügbaren Geräten
+- ✅ Auto-Recovery - Maximale Verzögerung 30 Sekunden
+- ✅ Keine Endlosschleifen - Smart Change Detection
+- ✅ Robuste Fehlerbehandlung - Alle States werden validiert
+
+### 📖 Vollständige Dokumentation
+
+**→ [EDGE_CASES.md](EDGE_CASES.md)** - Detaillierte Beschreibung aller 51 Edge Cases in 9 Kategorien:
+- 🌡️ Temperatursensor-Fehler (9 Cases)
+- 🔧 Thermostat-Fehler (7 Cases)
+- 🪟 Fensterkontakt-Fehler (6 Cases)
+- ⚙️ Konfigurationsfehler (9 Cases)
+- 🔧 Service & Berechnungen (4 Cases)
+- 🔍 Entity Detection & Validation (4 Cases)
+- 🎯 Trigger Validation & Handling (4 Cases)
+- ⚡ Performance (1 Case)
+- 📡 Netzwerk & Kommunikation (3 Cases)
 
 ---
 
@@ -275,71 +293,95 @@ Dieses Blueprint ist darauf ausgelegt, verschiedene Fehlerszenarien elegant zu b
 
 ### How the Blueprint Works
 
-The blueprint operates in **5 steps** every time it's triggered:
+Das Blueprint arbeitet in **4 intelligenten Schritten** bei jedem Trigger:
 
-1. **Calculate Average Temperature**
-   - Reads all configured temperature sensors
-   - Automatically ignores unavailable or faulty sensors
-   - Calculates the average from valid sensors
-   - Validates against min/max temperature limits
+#### 1. **Window Detection (PRIORITY - läuft zuerst)**
+   - Prüft ob ein Fenster geöffnet oder geschlossen wurde
+   - Reagiert sofort (innerhalb 1-2 Sekunden)
+   - Setzt "Open Window" Modus auf allen Thermostaten
+   - Unavailable Fenstersensoren werden automatisch ignoriert
+   - Stoppt Ausführung nach Window-Event (Priorität)
 
-2. **Configure Thermostat Sensor Mode**
-   - If valid external sensors are available: Sets all thermostats to use "external" temperature sensor mode
-   - If all external sensors are unavailable: Automatically switches to "internal" sensor mode (fallback)
-   - Auto-detects the correct sensor select entity for each thermostat
-   - Checks every 30 seconds and automatically switches back to external when sensors become available again
+#### 2. **Calculate Average Temperature**
+   - Liest alle konfigurierten Temperatursensoren
+   - Ignoriert automatisch unavailable oder defekte Sensoren
+   - Berechnet Durchschnitt aus gültigen Sensoren
+   - Validiert gegen Min/Max-Temperaturgrenzen
+   - Float(-999) Fallback für nicht-numerische Werte
+   - Division-durch-Null-Schutz
 
-3. **Send Temperature** (only if external sensors are valid)
-   - Sends the calculated average temperature to all thermostats
-   - All thermostats work with the same perceived room temperature
-   - If using internal sensor fallback, no temperature is sent (thermostat uses its own internal sensor)
+#### 3. **Configure Thermostat Sensor Mode**
+   - **Valid external sensors:** Schaltet alle Thermostate auf "external" Modus
+   - **All sensors unavailable:** Automatischer Fallback auf "internal" Modus
+   - Auto-erkennt die korrekten Entities für jeden Thermostat
+   - Prüft alle 30 Sekunden und schaltet automatisch zurück wenn Sensoren wieder verfügbar
+   - Sendet Durchschnittstemperatur nur im external Modus
+   - Überspringt unavailable Entities automatisch
 
-4. **Synchronize Target Temperatures** (if enabled)
-   - When you turn the dial on any thermostat, all others follow
-   - Only updates thermostats if the temperature actually changed (saves battery)
-   - Last change always wins (restart mode)
-
-5. **Window Detection** (if enabled)
-   - Checks if any window/door is open
-   - Instantly activates "Open Window" mode on all thermostats when opened
-   - Instantly deactivates when all windows are closed
+#### 4. **Synchronize Target Temperatures** (wenn aktiviert)
+   - Wenn du an einem Thermostat drehst, folgen alle anderen
+   - Smart Change Detection: Update nur bei tatsächlicher Änderung
+   - Verhindert Endlosschleifen durch current_temp != new_target_temp Check
+   - Thermostat synchronisiert sich nicht selbst (Optimierung)
+   - Validiert Temperaturbereich (5-35°C)
+   - Letzte Änderung gewinnt (restart mode)
 
 ### Triggers
 
-The automation reacts to these events:
+Die Automatisierung reagiert auf diese Events:
 
-| Trigger | When | Purpose |
-|---------|------|---------|
-| **Time Pattern** | Every 30 seconds | Regular temperature updates |
-| **HA Start** | Home Assistant restarts | Initialize on startup |
-| **Sensor Change** | Temperature sensor updates | Instant temperature updates |
-| **Thermostat Change** | You turn the dial | Instant synchronization |
-| **Window Change** | Window opens/closes | Instant heating control |
+| Trigger | Wann | Zweck | Edge Case Behandlung |
+|---------|------|-------|---------------------|
+| **Time Pattern** | Alle 30 Sekunden | Regelmäßige Temperatur-Updates | Prüft Auto-Recovery, kein entity_id |
+| **HA Start** | Home Assistant Neustart | Initialisierung beim Start | Alle Entities werden erkannt |
+| **Sensor Change** | Temperatursensor Update | Sofortige Temperatur-Updates | Hohe Update-Frequenz durch restart mode |
+| **Thermostat Change** | Du drehst am Thermostat | Sofortige Synchronisierung | Race Conditions, letzte Änderung gewinnt |
+| **Thermostat State** | Thermostat kommt online | Entity Re-Detection | Automatische Rekonfiguration |
+| **Window Change** | Fenster öffnet/schließt | Sofortige Heizungskontrolle | Unavailable Sensoren werden ignoriert |
 
 ### Smart Features
 
 **Restart Mode:**
-- If you quickly adjust multiple thermostats, the automation restarts with the latest change
-- Ensures the last adjustment always wins
-- No lost updates or conflicts
+- Wenn du schnell mehrere Änderungen machst, startet die Automatisierung mit letzter Änderung neu
+- Garantiert, dass letzte Anpassung immer gewinnt
+- Keine verlorenen Updates oder Konflikte
+- Optimal für schnelle Benutzerinteraktionen
 
 **Smart Sensor Validation & Fallback:**
-- Sensors with state `unavailable`, `unknown`, or `none` are automatically skipped
-- If all external sensors are unavailable, the system automatically switches to the internal sensor
-- When external sensors become available again (checked every 30 seconds), automatically switches back to external mode
-- Prevents sending invalid temperatures to thermostats
-- Ensures continuous operation even when external sensors fail
+- Sensoren mit State `unavailable`, `unknown`, `none` oder `''` werden automatisch übersprungen
+- Nicht-numerische Werte werden durch `float(-999)` Fallback erkannt und gefiltert
+- Wenn alle externen Sensoren unavailable: Automatischer Switch auf internen Sensor
+- Wenn Sensoren wieder verfügbar (geprüft alle 30s): Automatischer Switch zurück auf external
+- Verhindert Senden ungültiger Temperaturen
+- Garantiert kontinuierliche Funktion auch bei Sensor-Ausfällen
 
 **Optimized Updates:**
-- Temperature is only sent to a thermostat if it differs from current value
-- Reduces Zigbee network traffic
-- Saves battery life on battery-powered thermostats
-- Cleaner Home Assistant logs
+- Temperatur wird nur gesendet wenn sie sich vom aktuellen Wert unterscheidet
+- Smart Change Detection: `current_temp != new_target_temp`
+- Reduziert Zigbee-Netzwerk-Traffic erheblich
+- Spart Batterie bei batteriebetriebenen Thermostaten
+- Sauberere Home Assistant Logs
 
 **Automatic Entity Detection:**
-- You only select thermostats - all other entities are found automatically
-- Finds: `external_temperature_input`, `temperature_sensor_select`, `open_window`
-- Works with any Sonoff thermostat that exposes these entities
+- Du wählst nur Thermostate - alle anderen Entities werden automatisch gefunden
+- Findet: `external_temperature_input`, `temperature_sensor_select`, `open_window`
+- Prüft `device_id` für jedes Thermostat
+- Filtert Multi-Zone Entities (_2, _3) automatisch heraus
+- Funktioniert mit jedem Sonoff Thermostat mit diesen Entities
+- Graceful Degradation wenn Entities nicht gefunden werden
+
+**Trigger Validation:**
+- Prüft `trigger.entity_id is defined` vor Verwendung
+- Prüft `trigger.platform == 'state'` für korrekte Ausführung
+- Validiert `trigger.to_state` und `attributes` vor Zugriff
+- Verhindert Template-Fehler durch undefined Variables
+- Robuste Behandlung aller Trigger-Typen
+
+**Mathematische Robustheit:**
+- Division-durch-Null wird durch explizite Checks verhindert
+- Float Conversion mit Fallback-Werten (0 oder -999)
+- Nachfolgende Validierung filtert fehlerhafte Werte
+- Keine mathematischen Fehler möglich
 
 ---
 

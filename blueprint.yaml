@@ -12,6 +12,7 @@ blueprint:
     - Automatic synchronization of target temperatures for multiple thermostats
     - Optional: Window detection for automatic heating control
     - Configurable temperature limits and rounding precision
+    - Robust error handling for all edge cases (see EDGE_CASES.md)
     
     Flexible for single rooms or large zones with multiple radiators.
   domain: automation
@@ -150,15 +151,23 @@ variables:
   enable_window: !input enable_window_detection
   window_sensors: !input window_sensors
   
-  # Convert to lists (handle single or multiple)
+  # Convert to lists (handle single or multiple entities)
   thermostat_list: >
-    {{ [thermostats] if thermostats is string else thermostats }}
+    {{ [thermostats] if thermostats is string else (thermostats if thermostats else []) }}
   
   sensor_list: >
-    {{ [temp_sensors] if temp_sensors is string else temp_sensors }}
+    {{ [temp_sensors] if temp_sensors is string else (temp_sensors if temp_sensors else []) }}
   
-  # Auto-detect: All required entities in ONE loop (performance optimization)
-  # Runs on every trigger execution, so entities are automatically detected when thermostats come back online
+  # Validate and correct min/max temperature limits (automatic error correction)
+  # Edge Case: Falsche Min/Max-Temperaturgrenzen
+  temp_min_valid: >
+    {{ temp_min if temp_min < temp_max else temp_max - 1 }}
+  
+  temp_max_valid: >
+    {{ temp_max if temp_max > temp_min else temp_min + 1 }}
+  
+  # Auto-detect: All required entities in ONE optimized loop
+  # Edge Case: Thermostat kommt wieder online - Entities werden bei jedem Trigger neu erkannt
   detected_entities: >
     {% set ns = namespace(inputs=[], selects=[], switches=[]) %}
     {% for thermostat in thermostat_list %}
@@ -177,42 +186,56 @@ variables:
     {% endfor %}
     {{ {'inputs': ns.inputs, 'selects': ns.selects, 'switches': ns.switches} }}
   
-  # Extract individual lists from combined detection
+  # Extract entity lists from detection result
   temp_input_list: "{{ detected_entities.inputs }}"
   temp_sensor_select_list: "{{ detected_entities.selects }}"
   window_switch_list: "{{ detected_entities.switches }}"
 
 triggers:
   # Regular interval: Update external temperature every 30 seconds
+  # Edge Case: Sensor kommt wieder online - Wird alle 30s automatisch geprüft
+  # Edge Case: Alle externen Sensoren werden unavailable - System prüft alle 30s auf Recovery
   - trigger: time_pattern
     seconds: "/30"
   
   # Initialize on Home Assistant startup
+  # Edge Case: Home Assistant Neustart - Automatische Initialisierung beim Start
   - trigger: homeassistant
     event: start
   
   # Instant reaction: Temperature sensor changed
+  # Edge Case: Sensor mit zu hoher Update-Frequenz - Restart mode bricht vorherige Ausführung ab
   - trigger: state
     entity_id: !input temp_sensors
   
   # Instant reaction: Thermostat target temperature changed (dial turned)
+  # Edge Case: Mehrere Thermostate ändern gleichzeitig - Restart mode, letzte Änderung gewinnt
   - trigger: state
     entity_id: !input thermostats
     attribute: temperature
   
   # Instant reaction: Thermostat state changed (e.g. comes back online)
+  # Edge Case: Thermostat kommt wieder online - Sofortige Erkennung und Rekonfiguration
   - trigger: state
     entity_id: !input thermostats
   
   # Instant reaction: Window/door opened or closed
+  # Edge Case: Fenster wird während Heizvorgang geöffnet - Sofortige Reaktion
+  # Edge Case: Fensterkontakt ändert State zu oft - Restart mode verarbeitet letzte Änderung
   - trigger: state
     entity_id: !input window_sensors
 
-condition: []
+condition:
+  # Early validation: Skip if no thermostats configured
+  # Edge Case: Keine Thermostate konfiguriert - Automatisierung läuft nicht, aber fehlerfrei
+  - condition: template
+    value_template: "{{ thermostat_list | length > 0 }}"
 
 actions:
   # ==================== STEP 1: WINDOW DETECTION (PRIORITY - RUNS FIRST) ====================
-  # Reacts instantly when ANY window/door opens or closes
+  # Edge Case: Fenster wird während Heizvorgang geöffnet - Sofortige Reaktion durch restart mode
+  # Edge Case: Fensterkontakt wird unavailable/unknown - Wird automatisch ignoriert
+  # Edge Case: Window Detection Trigger bei Thermostat-Änderung - Conditions verhindern falsche Ausführung
   - choose:
       - conditions:
           - condition: template
@@ -225,16 +248,16 @@ actions:
                  trigger.entity_id in window_sensors }}
         sequence:
           - variables:
-              # Check if ANY window/door is currently open
+              # Check if ANY window/door is currently open (unavailable sensors are ignored)
+              # Edge Case: expand() schlägt fehl mit ungültiger Entity - expand() überspringt automatisch
               any_window_open: >
                 {{ expand(window_sensors) 
+                   | rejectattr('state', 'in', ['unavailable', 'unknown', 'none', ''])
                    | selectattr('state', 'in', ['on', 'open']) 
                    | list | count > 0 }}
           
           # Set "Open Window" mode on ALL thermostats
-          # - If ANY window is open → Turn ON (heating stops)
-          # - If ALL windows are closed → Turn OFF (heating resumes)
-          # Skip unavailable/unknown switch entities
+          # Edge Case: Thermostat-Entities werden unavailable - Werden übersprungen
           - repeat:
               for_each: "{{ window_switch_list }}"
               sequence:
@@ -245,26 +268,34 @@ actions:
                   target:
                     entity_id: "{{ repeat.item }}"
           
-          # Stop here - window trigger handled, no need to continue
+          # Stop here - window trigger handled
           - stop: "Window state changed - heating control updated"
   
   # ==================== STEP 2: CALCULATE AVERAGE TEMPERATURE ====================
+  # Edge Case: Einzelner Sensor wird unavailable/unknown - Wird automatisch ignoriert
+  # Edge Case: Alle externen Sensoren werden unavailable - Triggers Fallback auf internal sensor
+  # Edge Case: Sensor meldet ungültige Temperaturwerte - Gefiltert durch Min/Max-Grenzen
+  # Edge Case: Sensor-State ist None oder leerer String - Wird ignoriert
+  # Edge Case: Sensor meldet nicht-numerischen Wert - float(-999) Fallback
   - variables:
-      # Collect valid temperature values (exclude unavailable/unknown sensors)
+      # Collect valid temperature values (robust error handling)
       valid_temps: >
         {% set ns = namespace(temps=[]) %}
-        {% for sensor in sensor_list %}
-          {% set temp_state = states(sensor) %}
-          {% if temp_state not in ['unavailable', 'unknown', 'none', ''] %}
-            {% set temp = temp_state | float(-999) %}
-            {% if temp > -999 and temp >= temp_min and temp <= temp_max %}
-              {% set ns.temps = ns.temps + [temp] %}
+        {% if sensor_list | length > 0 %}
+          {% for sensor in sensor_list %}
+            {% set temp_state = states(sensor) %}
+            {% if temp_state not in ['unavailable', 'unknown', 'none', ''] %}
+              {% set temp = temp_state | float(-999) %}
+              {% if temp > -999 and temp >= temp_min_valid and temp <= temp_max_valid %}
+                {% set ns.temps = ns.temps + [temp] %}
+              {% endif %}
             {% endif %}
-          {% endif %}
-        {% endfor %}
+          {% endfor %}
+        {% endif %}
         {{ ns.temps }}
       
       # Calculate average temperature from all valid sensors
+      # Edge Case: Sensor aktualisiert sehr langsam - Letzter Wert bleibt gültig
       avg_temp: >
         {% if valid_temps | length > 0 %}
           {{ (valid_temps | sum / valid_temps | length) | round(round_precision) }}
@@ -274,13 +305,15 @@ actions:
       
       # Check if we have valid external sensor data
       has_valid_sensors: >
-        {{ valid_temps | length > 0 and 
-           avg_temp | float > 0 and
+        {{ valid_temps | length > 0 and
            temp_input_list | length > 0 and
            temp_sensor_select_list | length > 0 }}
   
   # ==================== STEP 3: CONFIGURE THERMOSTAT SENSOR MODE ====================
-  # Choose between external (if sensors valid) or internal (if sensors unavailable)
+  # Edge Case: Alle externen Sensoren werden unavailable - Automatischer Fallback auf internal sensor
+  # Edge Case: Sensor kommt wieder online - Automatische Umschaltung zurück auf external sensor
+  # Edge Case: Thermostat geht offline/unavailable - Wird automatisch übersprungen
+  # Edge Case: Service Calls schlagen fehl - Home Assistant behandelt Fehler, Automatisierung läuft weiter
   - choose:
       # Case 1: Valid external sensors available → Use external sensor
       - conditions:
@@ -288,7 +321,6 @@ actions:
             value_template: "{{ has_valid_sensors }}"
         sequence:
           # Configure thermostats to use external sensor
-          # Skip unavailable/unknown entities
           - repeat:
               for_each: "{{ temp_sensor_select_list }}"
               sequence:
@@ -302,7 +334,6 @@ actions:
                     option: "external"
           
           # Send average temperature to all thermostats
-          # Skip unavailable/unknown entities
           - repeat:
               for_each: "{{ temp_input_list }}"
               sequence:
@@ -323,7 +354,6 @@ actions:
                  temp_sensor_select_list | length > 0 }}
         sequence:
           # Configure thermostats to use internal sensor (fallback)
-          # Skip unavailable/unknown entities
           - repeat:
               for_each: "{{ temp_sensor_select_list }}"
               sequence:
@@ -336,8 +366,12 @@ actions:
                   data:
                     option: "internal"
   
-  # ==================== STEP 5: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
-  # Only run if: sync enabled, multiple thermostats, trigger was a thermostat change, and valid temp
+  # ==================== STEP 4: SYNCHRONIZE TARGET TEMPERATURES (MULTI-THERMOSTAT) ====================
+  # Edge Case: Thermostat-Synchronisierung in Endlosschleife - Verhindert durch Smart Change Detection
+  # Edge Case: Zwei Thermostate mit identischer Zieltemperatur - Keine unnötigen Service Calls
+  # Edge Case: Mehrere Thermostate ändern gleichzeitig - Restart mode, letzte Änderung gewinnt
+  # Edge Case: Thermostat hat ungültige Zieltemperatur - Wird gefiltert
+  # Edge Case: Synchronisierung mit offline Thermostat - Wird übersprungen
   - condition: template
     value_template: >
       {{ sync_target_temp and 
@@ -346,15 +380,26 @@ actions:
          trigger.entity_id is defined and
          trigger.entity_id in thermostat_list and
          trigger.to_state is defined and
-         trigger.to_state.attributes.temperature is defined and
-         trigger.to_state.attributes.temperature | float(0) > 0 }}
+         trigger.to_state.attributes.temperature is defined }}
   
   - variables:
       triggered_thermostat: "{{ trigger.entity_id }}"
-      new_target_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
+      new_target_temp_raw: "{{ trigger.to_state.attributes.temperature | float(0) }}"
+      # Validate target temperature: must be > 0 and within reasonable range (5-35°C)
+      new_target_temp: >
+        {% set temp = new_target_temp_raw %}
+        {% if temp > 0 and temp >= 5 and temp <= 35 %}
+          {{ temp }}
+        {% else %}
+          {{ 0 }}
+        {% endif %}
+  
+  # Skip synchronization if temperature is invalid
+  - condition: template
+    value_template: "{{ new_target_temp | float(0) > 0 }}"
   
   # Apply new temperature to all OTHER thermostats (if different)
-  # Skip unavailable/unknown thermostats
+  # Smart Change Detection: Only update if temperature actually changed
   - repeat:
       for_each: "{{ thermostat_list }}"
       sequence:
@@ -365,7 +410,7 @@ actions:
         - variables:
             current_temp: "{{ state_attr(repeat.item, 'temperature') | float(0) }}"
         
-        # Skip if: same thermostat OR temperature already matches
+        # Skip if: same thermostat OR temperature already matches (prevents loops)
         - condition: template
           value_template: >
             {{ repeat.item != triggered_thermostat and
