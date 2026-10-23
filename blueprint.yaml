@@ -1,25 +1,8 @@
 blueprint:
   name: Sonoff Smart Climate Control
   description: >
-    Intelligent control of Sonoff thermostats (TRVZB) with external temperature sensors.
-
-    **Features:**
-    - Works with Zigbee2MQTT and ZHA
-    - Automatic detection of all required entities
-    - Simple configuration: Just select thermostats and sensors
-    - Control single or multiple thermostats
-    - One or multiple temperature sensors (average calculated for multiple sensors)
-    - Automatic fallback to internal sensor if external sensors become unavailable
-    - Failsafe refresh: re-pushes temperature before the TRVZB 2-hour timeout
-    - Compatible with old (`external`/`internal`) and new (`remote_temperature`/`local_temperature`) select options
-    - Automatic synchronization of target temperatures for multiple thermostats
-    - Optional: Window detection for automatic heating control
-    - Configurable temperature limits and rounding precision
-    - Auto-converts °F / K sensor values to Celsius
-    - Ignores a thermostat's own temperature sensor as source
-    - Optional: skip updates while a thermostat is off (avoids waking it)
-
-    Flexible for single rooms or large zones with multiple radiators.
+    External temperature sync for Sonoff TRVZB (Zigbee2MQTT & ZHA).
+    Multi-TRV support, optional window detection, failsafe refresh.
   domain: automation
   author: EyJunge1
   source_url: https://github.com/eyjunge1/ha-sonoff-smart-climate/blob/main/blueprint.yaml
@@ -30,20 +13,11 @@ blueprint:
     thermostat_section:
       name: Thermostat Configuration
       icon: mdi:thermostat
-      description: >
-        Select one or multiple thermostats and the associated sensors.
-        For multiple thermostats: All use the same external temperature sensor, and
-        when you adjust any thermostat, all others automatically match its temperature.
-        Simply turn the dial on any thermostat and all others follow!
-        Supports Zigbee2MQTT and ZHA.
+      description: Thermostats and external temperature sensors
       input:
         thermostats:
           name: Thermostat(s)
-          description: >
-            One or multiple Sonoff thermostats (climate entities).
-            For multiple thermostats: When you change the temperature on any thermostat
-            (by turning the dial), all others will automatically follow. This prevents
-            conflicts where thermostats work against each other.
+          description: One or more Sonoff climate entities
           selector:
             entity:
               multiple: true
@@ -52,10 +26,7 @@ blueprint:
 
         temp_sensors:
           name: Temperature Sensor(s)
-          description: >
-            One or multiple external temperature sensors (e.g. Aqara, Zigbee).
-            For multiple sensors, the average temperature will be calculated.
-            Do not select the thermostat's own temperature sensor — it is ignored automatically.
+          description: External sensors (average if multiple)
           selector:
             entity:
               multiple: true
@@ -66,12 +37,12 @@ blueprint:
     settings_section:
       name: Settings
       icon: mdi:cog
-      description: Configure the behavior of synchronization
+      description: Optional tuning
       collapsed: true
       input:
         temp_min:
           name: Minimum Temperature
-          description: Temperature values below this value will be ignored as invalid (after °C conversion)
+          description: Ignore readings below this (°C)
           default: 0
           selector:
             number:
@@ -82,7 +53,7 @@ blueprint:
 
         temp_max:
           name: Maximum Temperature
-          description: Temperature values above this value will be ignored as invalid (after °C conversion)
+          description: Ignore readings above this (°C)
           default: 50
           selector:
             number:
@@ -93,7 +64,7 @@ blueprint:
 
         round_precision:
           name: Rounding Precision
-          description: How many decimal places to round to
+          description: Decimal places
           default: 1
           selector:
             number:
@@ -103,21 +74,14 @@ blueprint:
 
         sync_target_temperature:
           name: Synchronize Target Temperature
-          description: >
-            When multiple thermostats are used, automatically synchronize their target temperatures
-            to avoid conflicts. When you change the temperature on any thermostat (by turning the dial),
-            all other thermostats will automatically be set to the same temperature. This ensures all
-            radiators work together instead of against each other.
+          description: Match setpoints across all selected TRVs
           default: true
           selector:
             boolean:
 
         failsafe_refresh_minutes:
           name: Failsafe Refresh Interval
-          description: >
-            Re-push the external temperature at least this often (even if unchanged).
-            The Sonoff TRVZB falls back to its internal sensor if it receives no external
-            update for ~2 hours. Keep this below 120 minutes (recommended: 45).
+          description: Re-push temp at least this often (TRVZB ~2h timeout)
           default: 45
           selector:
             number:
@@ -128,10 +92,7 @@ blueprint:
 
         skip_when_off:
           name: Skip Updates When Thermostat Is Off
-          description: >
-            Do not write external temperature or change sensor mode while a thermostat
-            is off. Prevents periodic updates from waking a TRV that you turned off
-            on purpose (known side effect of number.set_value on some firmwares).
+          description: Do not write while climate is off
           default: true
           selector:
             boolean:
@@ -139,24 +100,19 @@ blueprint:
     window_section:
       name: Window Detection (Optional)
       icon: mdi:window-open
-      description: >
-        Automatic heating control with open windows. Reacts instantly when
-        any window/door opens or closes. For multiple thermostats, all will be notified.
+      description: Open-window mode for selected contacts
       collapsed: true
       input:
         enable_window_detection:
           name: Enable Window Detection
-          description: Enable automatic detection of open windows
+          description: Turn on window handling
           default: false
           selector:
             boolean:
 
         window_sensors:
           name: Window Contacts
-          description: >
-            Select all window and door contacts for this room.
-            As soon as one of them opens or closes, ALL thermostats immediately react
-            and switch to "Open Window" mode. Works instantly, no delay!
+          description: Window/door sensors for this room
           default: []
           selector:
             entity:
